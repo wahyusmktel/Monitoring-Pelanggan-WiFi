@@ -9,6 +9,7 @@ import ODPPage from "@/pages/ODP";
 import PortMonitoring from "@/pages/PortMonitoring";
 import Payments from "@/pages/Payments";
 import PaymentMonitoring from "@/pages/PaymentMonitoring";
+import Settings from "@/pages/Settings";
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="/odc" element={<ODCPage />} />
         <Route path="/odp" element={<ODPPage />} />
         <Route path="/port-monitoring" element={<PortMonitoring />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/other" element={<div className="text-center text-xl">Other Page - Coming Soon</div>} />
       </Routes>
     </Router>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Layout from '@/components/Layout';
-import { Save, User, Bell, Shield, Palette, Mail, Phone, MapPin, Globe, Key } from 'lucide-react';
+import { Save, Bell, Shield, Palette, Mail, Phone, MapPin, Globe, Key } from 'lucide-react';
 
 const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState('general');
@@ -50,8 +50,6 @@ const Settings: React.FC = () => {
 
   const handleSave = async (section: string) => {
     setIsLoading(true);
-    
-    // Simulasi proses penyimpanan
     setTimeout(() => {
       setIsLoading(false);
       alert(`Pengaturan ${section} berhasil disimpan!`);
@@ -109,7 +107,6 @@ const Settings: React.FC = () => {
         </div>
 
         <div className="bg-white rounded-lg shadow-md">
-          {/* Tab Navigation */}
           <div className="border-b border-gray-200">
             <nav className="flex space-x-8 px-6" aria-label="Tabs">
               {tabs.map((tab) => {
@@ -132,9 +129,7 @@ const Settings: React.FC = () => {
             </nav>
           </div>
 
-          {/* Tab Content */}
           <div className="p-6">
-            {/* General Settings */}
             {activeTab === 'general' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -241,7 +236,6 @@ const Settings: React.FC = () => {
               </div>
             )}
 
-            {/* Notification Settings */}
             {activeTab === 'notifications' && (
               <div className="space-y-6">
                 <div className="space-y-4">
@@ -362,7 +356,6 @@ const Settings: React.FC = () => {
               </div>
             )}
 
-            {/* Security Settings */}
             {activeTab === 'security' && (
               <div className="space-y-6">
                 <div className="space-y-4">
@@ -479,7 +472,6 @@ const Settings: React.FC = () => {
               </div>
             )}
 
-            {/* Appearance Settings */}
             {activeTab === 'appearance' && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -48,6 +48,7 @@ interface Payment {
   description?: string;
   token?: string;
   tokenStatus?: 'active' | 'expired' | 'unused';
+  tokenExpiry?: string;
   billingMonth: number;
   billingYear: number;
 }

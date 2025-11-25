@@ -23,7 +23,8 @@ interface DashboardStats {
 interface ChartData {
   name: string;
   value: number;
-  color?: string;
+  color: string;
+  [key: string]: unknown; // Index signature for recharts compatibility
 }
 
 interface RevenueData {

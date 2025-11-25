@@ -12,6 +12,11 @@ interface ODP {
   odcId: string;
   odcName: string;
   odcPort: number;
+  status: 'active' | 'inactive' | 'maintenance';
+  type: 'distribution' | 'terminal' | 'splitter';
+  description?: string;
+  installationDate: string;
+  customerCount: number;
 }
 
 // Interface untuk Paket Layanan
@@ -33,7 +38,7 @@ interface Customer {
   address: string;
   odpId: string;
   odpName: string;
-  odpPort: number;
+  odcPort: number;
   packageId: string;
   packageName: string;
   monthlyFee: number;
@@ -54,7 +59,11 @@ const Customers: React.FC = () => {
       usedPorts: 6,
       odcId: '1',
       odcName: 'ODC-Central-01',
-      odpPort: 1
+      odcPort: 1,
+      status: 'active',
+      type: 'distribution',
+      installationDate: '2023-01-01',
+      customerCount: 6
     },
     {
       id: '2',
@@ -64,7 +73,11 @@ const Customers: React.FC = () => {
       usedPorts: 3,
       odcId: '2',
       odcName: 'ODC-North-01',
-      odpPort: 2
+      odcPort: 2,
+      status: 'active',
+      type: 'distribution',
+      installationDate: '2023-01-15',
+      customerCount: 3
     }
   ]);
 
@@ -111,7 +124,7 @@ const Customers: React.FC = () => {
       address: 'Jl. Merdeka No. 10, Jakarta',
       odpId: '1',
       odpName: 'ODP-Central-01A',
-      odpPort: 3,
+      odcPort: 3,
       packageId: '2',
       packageName: 'Paket Standard',
       monthlyFee: 250000,
@@ -128,7 +141,7 @@ const Customers: React.FC = () => {
       address: 'Jl. Sudirman No. 45, Jakarta',
       odpId: '2',
       odpName: 'ODP-North-01B',
-      odpPort: 1,
+      odcPort: 1,
       packageId: '3',
       packageName: 'Paket Premium',
       monthlyFee: 400000,
@@ -153,7 +166,7 @@ const Customers: React.FC = () => {
     address: '',
     odpId: '',
     odpName: '',
-    odpPort: 1,
+    odcPort: 1,
     packageId: '',
     packageName: '',
     monthlyFee: 0,
@@ -176,7 +189,7 @@ const Customers: React.FC = () => {
     }
 
     // Validasi port ODP
-    if (!formData.odpPort) {
+    if (!formData.odcPort) {
       alert('Silakan pilih port ODP terlebih dahulu');
       return;
     }
@@ -200,11 +213,11 @@ const Customers: React.FC = () => {
     const isPortUsed = customers.some(cust => 
       cust.id !== editingCustomer?.id && 
       cust.odpId === formData.odpId && 
-      cust.odpPort === formData.odpPort
+      cust.odcPort === formData.odcPort
     );
     
     if (isPortUsed) {
-      alert(`Port ${formData.odpPort} di ODP ${selectedOdp.name} sudah digunakan oleh pelanggan lain`);
+      alert(`Port ${formData.odcPort} di ODP ${selectedOdp.name} sudah digunakan oleh pelanggan lain`);
       return;
     }
 
@@ -233,7 +246,7 @@ const Customers: React.FC = () => {
         address: customerData.address || '',
         odpId: customerData.odpId || '',
         odpName: customerData.odpName || selectedOdp.name,
-        odpPort: customerData.odpPort || 1,
+        odcPort: customerData.odcPort || 1,
         packageId: customerData.packageId || '',
         packageName: customerData.packageName || selectedPackage.name,
         monthlyFee: customerData.monthlyFee || selectedPackage.price,
@@ -256,7 +269,7 @@ const Customers: React.FC = () => {
       address: '',
       odpId: '',
       odpName: '',
-      odpPort: 1,
+      odcPort: 1,
       packageId: '',
       packageName: '',
       monthlyFee: 0,
@@ -305,7 +318,7 @@ const Customers: React.FC = () => {
         ...prev,
         odpId,
         odpName: selectedOdp.name,
-        odpPort: 1 // Reset to port 1 when ODP changes
+        odcPort: 1 // Reset to port 1 when ODP changes
       }));
     } else {
       setAvailablePorts([]);
@@ -314,7 +327,7 @@ const Customers: React.FC = () => {
         ...prev,
         odpId: '',
         odpName: '',
-        odpPort: 1
+        odcPort: 1
       }));
     }
   };
@@ -462,7 +475,7 @@ const Customers: React.FC = () => {
                   <Network className="w-4 h-4 mr-2" />
                   <span className="font-medium">ODP:</span>
                   <span className="ml-1">{customer.odpName}</span>
-                  <span className="ml-2 text-blue-600 font-medium">(Port {customer.odpPort})</span>
+                  <span className="ml-2 text-blue-600 font-medium">(Port {customer.odcPort})</span>
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <Package className="w-4 h-4 mr-2" />
@@ -608,8 +621,8 @@ const Customers: React.FC = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Port ODP *</label>
                         <select
                           required
-                          value={formData.odpPort}
-                          onChange={(e) => setFormData(prev => ({ ...prev, odpPort: parseInt(e.target.value) }))}
+                          value={formData.odcPort}
+                          onChange={(e) => setFormData(prev => ({ ...prev, odcPort: parseInt(e.target.value) }))}
                           disabled={!formData.odpId}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                         >

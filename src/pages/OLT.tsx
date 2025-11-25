@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import { Plus, Edit, Trash2, MapPin, Wifi, Router, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, MapPin, Wifi, Router, Search, X } from 'lucide-react';
 
 interface OLT {
   id: string;
