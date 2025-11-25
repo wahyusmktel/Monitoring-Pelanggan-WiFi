@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Plus, Edit, Trash2, Search, User, MapPin, Network, Package, CheckCircle, XCircle } from 'lucide-react';
+import MapPicker from '@/components/MapPicker';
+
+// Interface untuk Lokasi
+interface Location {
+  lat: number;
+  lng: number;
+  address?: string;
+}
 
 // Interface untuk ODP (akan diambil dari data ODP)
 interface ODP {
@@ -17,6 +25,7 @@ interface ODP {
   description?: string;
   installationDate: string;
   customerCount: number;
+  coordinates: Location;
 }
 
 // Interface untuk Paket Layanan
@@ -46,6 +55,7 @@ interface Customer {
   registrationDate: string;
   activationDate?: string;
   notes?: string;
+  coordinates: Location;
 }
 
 const Customers: React.FC = () => {
@@ -63,7 +73,12 @@ const Customers: React.FC = () => {
       status: 'active',
       type: 'distribution',
       installationDate: '2023-01-01',
-      customerCount: 6
+      customerCount: 6,
+      coordinates: {
+        lat: -6.2088,
+        lng: 106.8456,
+        address: 'Jl. Gatot Subroto Kav. 1A, Jakarta'
+      }
     },
     {
       id: '2',
@@ -77,7 +92,12 @@ const Customers: React.FC = () => {
       status: 'active',
       type: 'distribution',
       installationDate: '2023-01-15',
-      customerCount: 3
+      customerCount: 3,
+      coordinates: {
+        lat: -6.2255,
+        lng: 106.8292,
+        address: 'Jl. HR Rasuna Said Kav. 5B, Jakarta'
+      }
     }
   ]);
 
@@ -130,7 +150,12 @@ const Customers: React.FC = () => {
       monthlyFee: 250000,
       status: 'active',
       registrationDate: '2023-01-15',
-      activationDate: '2023-01-20'
+      activationDate: '2023-01-20',
+      coordinates: {
+        lat: -6.2095,
+        lng: 106.8465,
+        address: 'Jl. Merdeka No. 10, Jakarta'
+      }
     },
     {
       id: '2',
@@ -147,7 +172,12 @@ const Customers: React.FC = () => {
       monthlyFee: 400000,
       status: 'active',
       registrationDate: '2023-02-10',
-      activationDate: '2023-02-15'
+      activationDate: '2023-02-15',
+      coordinates: {
+        lat: -6.2265,
+        lng: 106.8285,
+        address: 'Jl. Sudirman No. 45, Jakarta'
+      }
     }
   ]);
 
@@ -172,7 +202,12 @@ const Customers: React.FC = () => {
     monthlyFee: 0,
     status: 'pending',
     registrationDate: new Date().toISOString().split('T')[0],
-    notes: ''
+    notes: '',
+    coordinates: {
+      lat: -6.2088,
+      lng: 106.8456,
+      address: ''
+    }
   });
 
   // State untuk dropdown yang bergantung
@@ -252,7 +287,8 @@ const Customers: React.FC = () => {
         monthlyFee: customerData.monthlyFee || selectedPackage.price,
         status: customerData.status || 'pending',
         registrationDate: customerData.registrationDate || new Date().toISOString().split('T')[0],
-        notes: customerData.notes
+        notes: customerData.notes,
+        coordinates: customerData.coordinates || { lat: -6.2088, lng: 106.8456 }
       };
       setCustomers(prev => [...prev, newCustomer]);
     }
@@ -275,7 +311,12 @@ const Customers: React.FC = () => {
       monthlyFee: 0,
       status: 'pending',
       registrationDate: new Date().toISOString().split('T')[0],
-      notes: ''
+      notes: '',
+      coordinates: {
+        lat: -6.2088,
+        lng: 106.8456,
+        address: ''
+      }
     });
     setAvailablePorts([]);
     setSelectedOdpDetails(null);
@@ -318,7 +359,8 @@ const Customers: React.FC = () => {
         ...prev,
         odpId,
         odpName: selectedOdp.name,
-        odcPort: 1 // Reset to port 1 when ODP changes
+        odcPort: 1, // Reset to port 1 when ODP changes
+        coordinates: selectedOdp.coordinates // Set location to ODP coordinates
       }));
     } else {
       setAvailablePorts([]);
@@ -492,13 +534,22 @@ const Customers: React.FC = () => {
               </div>
               
               <div className="flex justify-between items-center">
-                <button
-                  onClick={() => openGoogleMaps(customer.address)}
-                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
-                >
-                  <MapPin className="w-4 h-4 mr-1" />
-                  Lokasi
-                </button>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => openGoogleMaps(customer.address)}
+                    className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                  >
+                    <MapPin className="w-4 h-4 mr-1" />
+                    Google Maps
+                  </button>
+                  <button
+                    onClick={() => alert(`Koordinat: ${customer.coordinates.lat.toFixed(6)}, ${customer.coordinates.lng.toFixed(6)}`)}
+                    className="text-green-600 hover:text-green-800 text-sm flex items-center"
+                  >
+                    <MapPin className="w-4 h-4 mr-1" />
+                    Koordinat
+                  </button>
+                </div>
                 <div className="flex space-x-2">
                   <button
                     onClick={() => handleEdit(customer)}
@@ -594,6 +645,22 @@ const Customers: React.FC = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       rows={2}
                       placeholder="Alamat lengkap instalasi"
+                    />
+                  </div>
+
+                  {/* Peta Lokasi */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Lokasi di Peta</label>
+                    <MapPicker
+                      value={formData.coordinates}
+                      onChange={(location) => setFormData(prev => ({ 
+                        ...prev, 
+                        coordinates: location,
+                        address: location.address || prev.address || ''
+                      }))}
+                      height="300px"
+                      center={[-6.2088, 106.8456]}
+                      zoom={13}
                     />
                   </div>
 

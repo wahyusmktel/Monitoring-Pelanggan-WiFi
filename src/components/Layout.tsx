@@ -13,7 +13,8 @@ import {
   Network,
   MapPin,
   Box,
-  Activity
+  Activity,
+  Map
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -28,6 +29,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Pelanggan', href: '/customers', icon: Users },
+    { name: 'Peta Infrastruktur', href: '/network-map', icon: Map },
     { name: 'Langganan', href: '/subscriptions', icon: Package },
     { name: 'Pembayaran', href: '/payments', icon: DollarSign },
     { name: 'Pengaturan', href: '/settings', icon: Settings },
