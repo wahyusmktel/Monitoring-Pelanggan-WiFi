@@ -1,210 +1,165 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Plus, Edit, Trash2, MapPin, Box, Search, Network, ArrowRight, X } from 'lucide-react';
+import { odpService, ODP as ODPType, ODPCreate, ODPUpdate } from '@/services/odpService';
+import { odcService, ODC } from '@/services/odcService';
+import { toast } from 'sonner';
 
-interface ODC {
-  id: string;
-  name: string;
-  location: string;
-  capacity: number;
-  usedPorts: number;
-  oltId: string;
-  oltName: string;
-  oltPort: number;
-}
-
-interface ODP {
-  id: string;
-  name: string;
-  location: string;
-  latitude: number;
-  longitude: number;
-  odcId: string;
-  odcName: string;
-  odcPort: number;
-  capacity: number;
-  usedPorts: number;
-  status: 'active' | 'inactive' | 'maintenance';
-  type: 'distribution' | 'terminal' | 'splitter';
-  description?: string;
-  installationDate: string;
-  customerCount: number;
-}
+// Remove local interfaces since we're using the API interfaces
 
 const ODPPage: React.FC = () => {
-  // Data ODC untuk relasi
-  const [odcs] = useState<ODC[]>([
-    {
-      id: '1',
-      name: 'ODC-Central-01',
-      location: 'Jl. Gatot Subroto Kav. 1, Jakarta',
-      capacity: 32,
-      usedPorts: 24,
-      oltId: '1',
-      oltName: 'OLT-Central-01',
-      oltPort: 1
-    },
-    {
-      id: '2',
-      name: 'ODC-North-01',
-      location: 'Jl. HR Rasuna Said Kav. 5, Jakarta',
-      capacity: 16,
-      usedPorts: 12,
-      oltId: '2',
-      oltName: 'OLT-North-02',
-      oltPort: 3
-    }
-  ]);
-
-  const [odps, setOdps] = useState<ODP[]>([
-    {
-      id: '1',
-      name: 'ODP-Central-01A',
-      location: 'Jl. Gatot Subroto Kav. 1A, Jakarta',
-      latitude: -6.2154,
-      longitude: 106.8320,
-      odcId: '1',
-      odcName: 'ODC-Central-01',
-      odcPort: 1,
-      capacity: 8,
-      usedPorts: 6,
-      status: 'active',
-      type: 'distribution',
-      description: 'ODP untuk area perkantoran lantai 1-5',
-      installationDate: '2023-02-01',
-      customerCount: 6
-    },
-    {
-      id: '2',
-      name: 'ODP-North-01B',
-      location: 'Jl. HR Rasuna Said Kav. 5B, Jakarta',
-      latitude: -6.2002,
-      longitude: 106.8240,
-      odcId: '2',
-      odcName: 'ODC-North-01',
-      odcPort: 2,
-      capacity: 4,
-      usedPorts: 3,
-      status: 'active',
-      type: 'terminal',
-      description: 'ODP untuk rumah tinggal blok B',
-      installationDate: '2023-04-15',
-      customerCount: 3
-    }
-  ]);
+  const [odcs, setOdcs] = useState<ODC[]>([]);
+  const [odps, setOdps] = useState<ODPType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
   const [showForm, setShowForm] = useState(false);
-  const [editingOdp, setEditingOdp] = useState<ODP | null>(null);
+  const [editingOdp, setEditingOdp] = useState<ODPType | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterOdc, setFilterOdc] = useState<string>('all');
   const [showMap, setShowMap] = useState(false);
-  const [availablePorts, setAvailablePorts] = useState<number[]>([]);
 
-  const [formData, setFormData] = useState<Partial<ODP>>({
+  const [formData, setFormData] = useState<Partial<ODPCreate>>({
     name: '',
     location: '',
-    latitude: 0,
-    longitude: 0,
-    odcId: '',
-    odcName: '',
-    odcPort: 1,
+    latitude: null,
+    longitude: null,
+    odc_id: 0,
     capacity: 8,
-    usedPorts: 0,
+    used_capacity: 0,
     status: 'active',
-    type: 'distribution',
-    description: '',
-    installationDate: new Date().toISOString().split('T')[0],
-    customerCount: 0
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fetch ODP data
+  const fetchOdps = async () => {
+    try {
+      setLoading(true);
+      const response = await odpService.getAll(
+        currentPage, 
+        12, 
+        searchTerm, 
+        filterStatus === 'all' ? undefined : filterStatus,
+        filterOdc === 'all' ? undefined : parseInt(filterOdc)
+      );
+      setOdps(response.data);
+      setTotalItems(response.total);
+      setTotalPages(Math.ceil(response.total / response.size));
+    } catch (error) {
+      toast.error('Gagal memuat data ODP');
+      console.error('Error fetching ODPs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch ODC data for dropdown
+  const fetchOdcs = async () => {
+    try {
+      const response = await odcService.getAll(1, 100); // Get all ODCs for dropdown
+      setOdcs(response.data);
+    } catch (error) {
+      console.error('Error fetching ODCs:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchOdcs();
+    fetchOdps();
+  }, [currentPage, searchTerm, filterStatus, filterOdc]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validasi ODC selection
-    if (!formData.odcId) {
-      alert('Silakan pilih ODC terlebih dahulu');
+    if (!formData.odc_id) {
+      toast.error('Silakan pilih ODC terlebih dahulu');
       return;
     }
 
-    // Dapatkan nama ODC berdasarkan ID
-    const selectedOdc = odcs.find(odc => odc.id === formData.odcId);
-    if (!selectedOdc) {
-      alert('ODC yang dipilih tidak valid');
-      return;
+    try {
+      if (editingOdp) {
+        // Update existing ODP
+        const updateData: ODPUpdate = {
+          name: formData.name,
+          location: formData.location,
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          odc_id: formData.odc_id,
+          capacity: formData.capacity,
+          used_capacity: formData.used_capacity,
+          status: formData.status,
+        };
+        
+        await odpService.update(editingOdp.id, updateData);
+        toast.success('ODP berhasil diperbarui');
+      } else {
+        // Add new ODP
+        const createData: ODPCreate = {
+          name: formData.name || '',
+          location: formData.location || '',
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          odc_id: formData.odc_id,
+          capacity: formData.capacity || 8,
+          used_capacity: formData.used_capacity || 0,
+          status: formData.status || 'active',
+        };
+        
+        await odpService.create(createData);
+        toast.success('ODP berhasil ditambahkan');
+      }
+      
+      fetchOdps();
+      resetForm();
+    } catch (error) {
+      toast.error(editingOdp ? 'Gagal memperbarui ODP' : 'Gagal menambahkan ODP');
+      console.error('Error saving ODP:', error);
     }
-
-    const odpData = {
-      ...formData,
-      odcName: selectedOdc.name
-    };
-    
-    if (editingOdp) {
-      // Update existing ODP
-      setOdps(prev => prev.map(odp => 
-        odp.id === editingOdp.id 
-          ? { ...odp, ...odpData } as ODP
-          : odp
-      ));
-    } else {
-      // Add new ODP
-      const newOdp: ODP = {
-        id: Date.now().toString(),
-        name: odpData.name || '',
-        location: odpData.location || '',
-        latitude: odpData.latitude || 0,
-        longitude: odpData.longitude || 0,
-        odcId: odpData.odcId || '',
-        odcName: odpData.odcName || selectedOdc.name,
-        odcPort: odpData.odcPort || 1,
-        capacity: odpData.capacity || 8,
-        usedPorts: odpData.usedPorts || 0,
-        status: odpData.status || 'active',
-        type: odpData.type || 'distribution',
-        description: odpData.description,
-        installationDate: odpData.installationDate || new Date().toISOString().split('T')[0],
-        customerCount: odpData.customerCount || 0
-      };
-      setOdps(prev => [...prev, newOdp]);
-    }
-    
-    resetForm();
   };
 
   const resetForm = () => {
     setFormData({
       name: '',
       location: '',
-      latitude: 0,
-      longitude: 0,
-      odcId: '',
-      odcName: '',
-      odcPort: 1,
+      latitude: null,
+      longitude: null,
+      odc_id: 0,
       capacity: 8,
-      usedPorts: 0,
+      used_capacity: 0,
       status: 'active',
-      type: 'distribution',
-      description: '',
-      installationDate: new Date().toISOString().split('T')[0],
-      customerCount: 0
     });
-    setAvailablePorts([]);
     setShowForm(false);
     setEditingOdp(null);
   };
 
-  const handleEdit = (odp: ODP) => {
+  const handleEdit = (odp: ODPType) => {
     setEditingOdp(odp);
-    setFormData(odp);
-    // Set available ports when editing (assuming ODC has 32 ports max)
-    const ports = Array.from({ length: 32 }, (_, i) => i + 1);
-    setAvailablePorts(ports);
+    setFormData({
+      name: odp.name,
+      location: odp.location,
+      latitude: odp.latitude,
+      longitude: odp.longitude,
+      odc_id: odp.odc_id,
+      capacity: odp.capacity,
+      used_capacity: odp.used_capacity,
+      status: odp.status,
+    });
     setShowForm(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: number) => {
     if (confirm('Apakah Anda yakin ingin menghapus ODP ini?')) {
-      setOdps(prev => prev.filter(odp => odp.id !== id));
+      try {
+        await odpService.delete(id);
+        toast.success('ODP berhasil dihapus');
+        fetchOdps();
+      } catch (error) {
+        toast.error('Gagal menghapus ODP');
+        console.error('Error deleting ODP:', error);
+      }
     }
   };
 
@@ -226,49 +181,16 @@ const ODPPage: React.FC = () => {
     }
   };
 
-  const getTypeText = (type: string) => {
-    switch (type) {
-      case 'distribution': return 'Distribusi';
-      case 'terminal': return 'Terminal';
-      case 'splitter': return 'Splitter';
-      default: return type;
-    }
-  };
+  // Removed getTypeText and getTypeColor functions - type field not in API
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'distribution': return 'bg-purple-100 text-purple-800';
-      case 'terminal': return 'bg-orange-100 text-orange-800';
-      case 'splitter': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const filteredOdps = odps.filter(odp => {
-    const matchesSearch = odp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         odp.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         odp.odcName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || odp.status === filterStatus;
-    const matchesOdc = filterOdc === 'all' || odp.odcId === filterOdc;
-    return matchesSearch && matchesStatus && matchesOdc;
-  });
+  // No need for local filtering since we're using API filtering
+  const filteredOdps = odps;
 
   const openGoogleMaps = (latitude: number, longitude: number) => {
     window.open(`https://www.google.com/maps?q=${latitude},${longitude}`, '_blank');
   };
 
-  const handleOdcChange = (odcId: string) => {
-    const selectedOdc = odcs.find(odc => odc.id === odcId);
-    // Generate available ports (assuming ODC has 32 ports max)
-    const ports = Array.from({ length: 32 }, (_, i) => i + 1);
-    setAvailablePorts(ports);
-    setFormData(prev => ({
-      ...prev,
-      odcId,
-      odcName: selectedOdc?.name || '',
-      odcPort: 1 // Reset to port 1 when ODC changes
-    }));
-  };
+  // Removed handleOdcChange function - not needed since we don't have odcPort in API
 
   return (
     <Layout>
@@ -353,6 +275,14 @@ const ODPPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-2 text-gray-600">Memuat data ODP...</span>
+          </div>
+        )}
+
         {/* ODP Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {filteredOdps.map((odp) => (
@@ -371,35 +301,28 @@ const ODPPage: React.FC = () => {
                 <div className="flex items-center text-sm text-gray-600">
                   <Network className="w-4 h-4 mr-2" />
                   <span className="font-medium">ODC:</span>
-                  <span className="ml-1">{odp.odcName}</span>
-                  <span className="ml-2 text-blue-600 font-medium">(Port {odp.odcPort})</span>
+                  <span className="ml-1">{odp.odc_name}</span>
                 </div>
                 <p className="text-sm text-gray-600">
                   <span className="font-medium">Lokasi:</span> {odp.location}
                 </p>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">
-                    <span className="font-medium">Kapasitas:</span> {odp.usedPorts}/{odp.capacity}
-                  </span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${getTypeColor(odp.type)}`}>
-                    {getTypeText(odp.type)}
+                    <span className="font-medium">Kapasitas:</span> {odp.used_capacity}/{odp.capacity}
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-blue-600 h-2 rounded-full" 
-                    style={{ width: `${(odp.usedPorts / odp.capacity) * 100}%` }}
+                    style={{ width: `${(odp.used_capacity / odp.capacity) * 100}%` }}
                   ></div>
                 </div>
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span><span className="font-medium">Pelanggan:</span> {odp.customerCount}</span>
-                  <span><span className="font-medium">Instalasi:</span> {odp.installationDate}</span>
-                </div>
+                {/* Pelanggan and Instalasi info removed - not in API schema */}
               </div>
               
               <div className="flex justify-between items-center">
                 <button
-                  onClick={() => openGoogleMaps(odp.latitude, odp.longitude)}
+                  onClick={() => openGoogleMaps(odp.latitude || 0, odp.longitude || 0)}
                   className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
                 >
                   <MapPin className="w-4 h-4 mr-1" />
@@ -424,11 +347,34 @@ const ODPPage: React.FC = () => {
           ))}
         </div>
 
-        {filteredOdps.length === 0 && (
+        {!loading && filteredOdps.length === 0 && (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <Box className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">Tidak ada data ODP</h3>
             <p className="text-gray-600">Tambahkan data ODP untuk memulai.</p>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!loading && totalPages > 1 && (
+          <div className="flex justify-center items-center space-x-2 mt-8">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Sebelumnya
+            </button>
+            <span className="px-4 py-2 text-gray-700">
+              Halaman {currentPage} dari {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Selanjutnya
+            </button>
           </div>
         )}
 
@@ -458,11 +404,11 @@ const ODPPage: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">ODC *</label>
                       <select
                         required
-                        value={formData.odcId}
-                        onChange={(e) => handleOdcChange(e.target.value)}
+                        value={formData.odc_id}
+                        onChange={(e) => setFormData(prev => ({ ...prev, odc_id: parseInt(e.target.value) }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
-                        <option value="">Pilih ODC</option>
+                        <option value={0}>Pilih ODC</option>
                         {odcs.map((odc) => (
                           <option key={odc.id} value={odc.id}>
                             {odc.name} - {odc.location}
@@ -472,26 +418,7 @@ const ODPPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Port ODC *</label>
-                      <select
-                        required
-                        value={formData.odcPort}
-                        onChange={(e) => setFormData(prev => ({ ...prev, odcPort: parseInt(e.target.value) }))}
-                        disabled={!formData.odcId}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      >
-                        <option value="">Pilih Port</option>
-                        {availablePorts.map((port) => (
-                          <option key={port} value={port}>
-                            Port {port}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div></div>
-                  </div>
+                  {/* Port ODC field removed - not in API schema */}
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Lokasi *</label>
@@ -512,8 +439,8 @@ const ODPPage: React.FC = () => {
                         type="number"
                         required
                         step="0.000001"
-                        value={formData.latitude}
-                        onChange={(e) => setFormData(prev => ({ ...prev, latitude: parseFloat(e.target.value) }))}
+                        value={formData.latitude || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, latitude: e.target.value ? parseFloat(e.target.value) : null }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Contoh: -6.2154"
                       />
@@ -524,8 +451,8 @@ const ODPPage: React.FC = () => {
                         type="number"
                         required
                         step="0.000001"
-                        value={formData.longitude}
-                        onChange={(e) => setFormData(prev => ({ ...prev, longitude: parseFloat(e.target.value) }))}
+                        value={formData.longitude || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, longitude: e.target.value ? parseFloat(e.target.value) : null }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Contoh: 106.8320"
                       />
@@ -538,7 +465,7 @@ const ODPPage: React.FC = () => {
                       <select
                         required
                         value={formData.status}
-                        onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as ODP['status'] }))}
+                        onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
                         <option value="active">Aktif</option>
@@ -546,29 +473,7 @@ const ODPPage: React.FC = () => {
                         <option value="maintenance">Maintenance</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Tipe *</label>
-                      <select
-                        required
-                        value={formData.type}
-                        onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as ODP['type'] }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="distribution">Distribusi</option>
-                        <option value="terminal">Terminal</option>
-                        <option value="splitter">Splitter</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Instalasi *</label>
-                      <input
-                        type="date"
-                        required
-                        value={formData.installationDate}
-                        onChange={(e) => setFormData(prev => ({ ...prev, installationDate: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
+                    {/* Tipe and Tanggal Instalasi fields removed - not in API schema */}
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -590,34 +495,15 @@ const ODPPage: React.FC = () => {
                         required
                         min="0"
                         max={formData.capacity}
-                        value={formData.usedPorts}
-                        onChange={(e) => setFormData(prev => ({ ...prev, usedPorts: parseInt(e.target.value) }))}
+                        value={formData.used_capacity}
+                        onChange={(e) => setFormData(prev => ({ ...prev, used_capacity: parseInt(e.target.value) }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah Pelanggan *</label>
-                      <input
-                        type="number"
-                        required
-                        min="0"
-                        value={formData.customerCount}
-                        onChange={(e) => setFormData(prev => ({ ...prev, customerCount: parseInt(e.target.value) }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
+                    {/* Jumlah Pelanggan field removed - not in API schema */}
                   </div>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi</label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      rows={3}
-                      placeholder="Deskripsi tambahan (opsional)"
-                    />
-                  </div>
+                  {/* Deskripsi field removed - not in API schema */}
                   
                   <div className="flex justify-end space-x-3 pt-4">
                     <button
@@ -672,9 +558,9 @@ const ODPPage: React.FC = () => {
                               <span className="font-medium">{odp.name}</span>
                             </div>
                             <div className="flex items-center text-sm text-gray-500">
-                              <ArrowRight className="w-3 h-3 mr-1" />
-                              <span>{odp.odcName}</span>
-                            </div>
+                            <ArrowRight className="w-3 h-3 mr-1" />
+                            <span>{odp.odc_name}</span>
+                          </div>
                           </div>
                           <div className="text-sm text-gray-500 mt-1">{odp.location}</div>
                         </button>

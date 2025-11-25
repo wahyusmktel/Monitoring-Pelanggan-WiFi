@@ -1,186 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import { Plus, Edit, Trash2, Search, User, MapPin, Network, Package, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, User, MapPin, Network, Package, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import MapPicker from '@/components/MapPicker';
+import { customerService, Customer, CustomerCreate, CustomerUpdate } from '@/services/customerService';
+import { infrastructureService } from '@/services/infrastructureService';
+import { servicesService } from '@/services/servicesService';
 
-// Interface untuk Lokasi
-interface Location {
-  lat: number;
-  lng: number;
-  address?: string;
-}
-
-// Interface untuk ODP (akan diambil dari data ODP)
+// Interface untuk ODP (dari API)
 interface ODP {
-  id: string;
+  id: number;
   name: string;
   location: string;
-  capacity: number;
-  usedPorts: number;
-  odcId: string;
-  odcName: string;
-  odcPort: number;
-  status: 'active' | 'inactive' | 'maintenance';
-  type: 'distribution' | 'terminal' | 'splitter';
-  description?: string;
-  installationDate: string;
-  customerCount: number;
-  coordinates: Location;
+  total_ports: number;
+  used_ports: number;
+  status: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
-// Interface untuk Paket Layanan
+// Interface untuk Paket Layanan (dari API)
 interface Package {
-  id: string;
+  id: number;
   name: string;
   speed: string;
   price: number;
-  description: string;
-}
-
-// Interface untuk Pelanggan
-interface Customer {
-  id: string;
-  customerId: string;
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-  odpId: string;
-  odpName: string;
-  odcPort: number;
-  packageId: string;
-  packageName: string;
-  monthlyFee: number;
-  status: 'active' | 'inactive' | 'pending' | 'suspended';
-  registrationDate: string;
-  activationDate?: string;
-  notes?: string;
-  coordinates: Location;
+  description?: string | null;
 }
 
 const Customers: React.FC = () => {
-  // Data ODP (simulasi dari halaman ODP)
-  const [odps] = useState<ODP[]>([
-    {
-      id: '1',
-      name: 'ODP-Central-01A',
-      location: 'Jl. Gatot Subroto Kav. 1A, Jakarta',
-      capacity: 8,
-      usedPorts: 6,
-      odcId: '1',
-      odcName: 'ODC-Central-01',
-      odcPort: 1,
-      status: 'active',
-      type: 'distribution',
-      installationDate: '2023-01-01',
-      customerCount: 6,
-      coordinates: {
-        lat: -6.2088,
-        lng: 106.8456,
-        address: 'Jl. Gatot Subroto Kav. 1A, Jakarta'
-      }
-    },
-    {
-      id: '2',
-      name: 'ODP-North-01B',
-      location: 'Jl. HR Rasuna Said Kav. 5B, Jakarta',
-      capacity: 4,
-      usedPorts: 3,
-      odcId: '2',
-      odcName: 'ODC-North-01',
-      odcPort: 2,
-      status: 'active',
-      type: 'distribution',
-      installationDate: '2023-01-15',
-      customerCount: 3,
-      coordinates: {
-        lat: -6.2255,
-        lng: 106.8292,
-        address: 'Jl. HR Rasuna Said Kav. 5B, Jakarta'
-      }
-    }
-  ]);
-
-  // Data Paket Layanan
-  const [packages] = useState<Package[]>([
-    {
-      id: '1',
-      name: 'Paket Basic',
-      speed: '10 Mbps',
-      price: 150000,
-      description: 'Internet cepat untuk kebutuhan dasar'
-    },
-    {
-      id: '2',
-      name: 'Paket Standard',
-      speed: '20 Mbps',
-      price: 250000,
-      description: 'Internet stabil untuk keluarga'
-    },
-    {
-      id: '3',
-      name: 'Paket Premium',
-      speed: '50 Mbps',
-      price: 400000,
-      description: 'Internet super cepat untuk profesional'
-    },
-    {
-      id: '4',
-      name: 'Paket Ultra',
-      speed: '100 Mbps',
-      price: 650000,
-      description: 'Internet ultra cepat untuk gamer dan streamer'
-    }
-  ]);
-
-  // Data Pelanggan
-  const [customers, setCustomers] = useState<Customer[]>([
-    {
-      id: '1',
-      customerId: 'CUST-001',
-      name: 'Budi Santoso',
-      email: 'budi@email.com',
-      phone: '081234567890',
-      address: 'Jl. Merdeka No. 10, Jakarta',
-      odpId: '1',
-      odpName: 'ODP-Central-01A',
-      odcPort: 3,
-      packageId: '2',
-      packageName: 'Paket Standard',
-      monthlyFee: 250000,
-      status: 'active',
-      registrationDate: '2023-01-15',
-      activationDate: '2023-01-20',
-      coordinates: {
-        lat: -6.2095,
-        lng: 106.8465,
-        address: 'Jl. Merdeka No. 10, Jakarta'
-      }
-    },
-    {
-      id: '2',
-      customerId: 'CUST-002',
-      name: 'Siti Nurhaliza',
-      email: 'siti@email.com',
-      phone: '081298765432',
-      address: 'Jl. Sudirman No. 45, Jakarta',
-      odpId: '2',
-      odpName: 'ODP-North-01B',
-      odcPort: 1,
-      packageId: '3',
-      packageName: 'Paket Premium',
-      monthlyFee: 400000,
-      status: 'active',
-      registrationDate: '2023-02-10',
-      activationDate: '2023-02-15',
-      coordinates: {
-        lat: -6.2265,
-        lng: 106.8285,
-        address: 'Jl. Sudirman No. 45, Jakarta'
-      }
-    }
-  ]);
-
+  // State untuk data dari API
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [odps, setOdps] = useState<ODP[]>([]);
+  const [packages, setPackages] = useState<Package[]>([]);
+  
+  // State untuk loading dan error
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  
+  // State untuk form dan UI
   const [showForm, setShowForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -188,135 +46,113 @@ const Customers: React.FC = () => {
   const [filterOdp, setFilterOdp] = useState<string>('all');
 
   // State untuk form
-  const [formData, setFormData] = useState<Partial<Customer>>({
-    customerId: '',
+  const [formData, setFormData] = useState<Partial<CustomerCreate>>({
     name: '',
     email: '',
     phone: '',
     address: '',
-    odpId: '',
-    odpName: '',
-    odcPort: 1,
-    packageId: '',
-    packageName: '',
-    monthlyFee: 0,
+    latitude: null,
+    longitude: null,
+    odp_id: null,
+    package_id: null,
     status: 'pending',
-    registrationDate: new Date().toISOString().split('T')[0],
+    installation_date: new Date().toISOString().split('T')[0],
     notes: '',
-    coordinates: {
-      lat: -6.2088,
-      lng: 106.8456,
-      address: ''
-    }
+    is_active: true,
   });
 
   // State untuk dropdown yang bergantung
   const [availablePorts, setAvailablePorts] = useState<number[]>([]);
   const [selectedOdpDetails, setSelectedOdpDetails] = useState<ODP | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fetch data dari API
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Fetch semua data secara parallel
+      const [customersData, odpsData, packagesData] = await Promise.all([
+        customerService.getCustomers(),
+        infrastructureService.getODPs(),
+        servicesService.getPackages(),
+      ]);
+      
+      setCustomers(customersData);
+      setOdps(odpsData);
+      setPackages(packagesData);
+    } catch (err) {
+      setError('Gagal memuat data dari server. Silakan coba lagi.');
+      console.error('Error fetching data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validasi form
+    if (!formData.name || !formData.email || !formData.phone || !formData.address) {
+      alert('Semua field wajib diisi!');
+      return;
+    }
+
     // Validasi ODP selection
-    if (!formData.odpId) {
+    if (!formData.odp_id) {
       alert('Silakan pilih ODP terlebih dahulu');
       return;
     }
 
-    // Validasi port ODP
-    if (!formData.odcPort) {
-      alert('Silakan pilih port ODP terlebih dahulu');
-      return;
-    }
-
     // Validasi paket
-    if (!formData.packageId) {
+    if (!formData.package_id) {
       alert('Silakan pilih paket layanan terlebih dahulu');
       return;
     }
 
-    // Dapatkan detail ODP dan Paket yang dipilih
-    const selectedOdp = odps.find(odp => odp.id === formData.odpId);
-    const selectedPackage = packages.find(pkg => pkg.id === formData.packageId);
-    
-    if (!selectedOdp || !selectedPackage) {
-      alert('ODP atau Paket yang dipilih tidak valid');
-      return;
+    try {
+      setSubmitting(true);
+      
+      if (editingCustomer) {
+        // Update existing customer
+        const updatedCustomer = await customerService.updateCustomer(editingCustomer.id!, formData);
+        setCustomers(prev => prev.map(customer => 
+          customer.id === editingCustomer.id ? updatedCustomer : customer
+        ));
+      } else {
+        // Create new customer
+        const newCustomer = await customerService.createCustomer(formData as CustomerCreate);
+        setCustomers(prev => [...prev, newCustomer]);
+      }
+      
+      resetForm();
+      alert(editingCustomer ? 'Pelanggan berhasil diupdate!' : 'Pelanggan baru berhasil ditambahkan!');
+    } catch (err) {
+      console.error('Error submitting customer:', err);
+      alert('Gagal menyimpan data pelanggan. Silakan coba lagi.');
+    } finally {
+      setSubmitting(false);
     }
-
-    // Cek apakah port sudah digunakan
-    const isPortUsed = customers.some(cust => 
-      cust.id !== editingCustomer?.id && 
-      cust.odpId === formData.odpId && 
-      cust.odcPort === formData.odcPort
-    );
-    
-    if (isPortUsed) {
-      alert(`Port ${formData.odcPort} di ODP ${selectedOdp.name} sudah digunakan oleh pelanggan lain`);
-      return;
-    }
-
-    const customerData = {
-      ...formData,
-      odpName: selectedOdp.name,
-      packageName: selectedPackage.name,
-      monthlyFee: selectedPackage.price
-    };
-    
-    if (editingCustomer) {
-      // Update existing customer
-      setCustomers(prev => prev.map(customer => 
-        customer.id === editingCustomer.id 
-          ? { ...customer, ...customerData } as Customer
-          : customer
-      ));
-    } else {
-      // Add new customer
-      const newCustomer: Customer = {
-        id: Date.now().toString(),
-        customerId: customerData.customerId || `CUST-${String(customers.length + 1).padStart(3, '0')}`,
-        name: customerData.name || '',
-        email: customerData.email || '',
-        phone: customerData.phone || '',
-        address: customerData.address || '',
-        odpId: customerData.odpId || '',
-        odpName: customerData.odpName || selectedOdp.name,
-        odcPort: customerData.odcPort || 1,
-        packageId: customerData.packageId || '',
-        packageName: customerData.packageName || selectedPackage.name,
-        monthlyFee: customerData.monthlyFee || selectedPackage.price,
-        status: customerData.status || 'pending',
-        registrationDate: customerData.registrationDate || new Date().toISOString().split('T')[0],
-        notes: customerData.notes,
-        coordinates: customerData.coordinates || { lat: -6.2088, lng: 106.8456 }
-      };
-      setCustomers(prev => [...prev, newCustomer]);
-    }
-    
-    resetForm();
   };
 
   const resetForm = () => {
     setFormData({
-      customerId: '',
       name: '',
       email: '',
       phone: '',
       address: '',
-      odpId: '',
-      odpName: '',
-      odcPort: 1,
-      packageId: '',
-      packageName: '',
-      monthlyFee: 0,
+      latitude: null,
+      longitude: null,
+      odp_id: null,
+      package_id: null,
       status: 'pending',
-      registrationDate: new Date().toISOString().split('T')[0],
+      installation_date: new Date().toISOString().split('T')[0],
       notes: '',
-      coordinates: {
-        lat: -6.2088,
-        lng: 106.8456,
-        address: ''
-      }
+      is_active: true,
     });
     setAvailablePorts([]);
     setSelectedOdpDetails(null);
@@ -326,13 +162,26 @@ const Customers: React.FC = () => {
 
   const handleEdit = (customer: Customer) => {
     setEditingCustomer(customer);
-    setFormData(customer);
+    setFormData({
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      address: customer.address,
+      latitude: customer.latitude,
+      longitude: customer.longitude,
+      odp_id: customer.odp_id,
+      package_id: customer.package_id,
+      status: customer.status,
+      installation_date: customer.installation_date,
+      notes: customer.notes,
+      is_active: customer.is_active,
+    });
     
     // Set available ports dan detail ODP saat editing
-    if (customer.odpId) {
-      const odp = odps.find(o => o.id === customer.odpId);
+    if (customer.odp_id) {
+      const odp = odps.find(o => o.id === customer.odp_id);
       if (odp) {
-        const ports = Array.from({ length: odp.capacity }, (_, i) => i + 1);
+        const ports = Array.from({ length: odp.total_ports }, (_, i) => i + 1);
         setAvailablePorts(ports);
         setSelectedOdpDetails(odp);
       }
@@ -341,47 +190,43 @@ const Customers: React.FC = () => {
     setShowForm(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: number) => {
     if (confirm('Apakah Anda yakin ingin menghapus pelanggan ini?')) {
-      setCustomers(prev => prev.filter(customer => customer.id !== id));
+      try {
+        await customerService.deleteCustomer(id);
+        setCustomers(prev => prev.filter(customer => customer.id !== id));
+        alert('Pelanggan berhasil dihapus!');
+      } catch (err) {
+        console.error('Error deleting customer:', err);
+        alert('Gagal menghapus pelanggan. Silakan coba lagi.');
+      }
     }
   };
 
-  const handleOdpChange = (odpId: string) => {
-    const selectedOdp = odps.find(odp => odp.id === odpId);
-    if (selectedOdp) {
-      // Generate available ports based on ODP capacity
-      const ports = Array.from({ length: selectedOdp.capacity }, (_, i) => i + 1);
-      setAvailablePorts(ports);
-      setSelectedOdpDetails(selectedOdp);
-      
-      setFormData(prev => ({
-        ...prev,
-        odpId,
-        odpName: selectedOdp.name,
-        odcPort: 1, // Reset to port 1 when ODP changes
-        coordinates: selectedOdp.coordinates // Set location to ODP coordinates
-      }));
+  const handleOdpChange = (odpId: number | null) => {
+    if (odpId) {
+      const selectedOdp = odps.find(odp => odp.id === odpId);
+      if (selectedOdp) {
+        // Generate available ports based on ODP capacity
+        const ports = Array.from({ length: selectedOdp.total_ports }, (_, i) => i + 1);
+        setAvailablePorts(ports);
+        setSelectedOdpDetails(selectedOdp);
+        
+        setFormData(prev => ({
+          ...prev,
+          odp_id: odpId,
+          latitude: selectedOdp.latitude,
+          longitude: selectedOdp.longitude,
+        }));
+      }
     } else {
       setAvailablePorts([]);
       setSelectedOdpDetails(null);
       setFormData(prev => ({
         ...prev,
-        odpId: '',
-        odpName: '',
-        odcPort: 1
-      }));
-    }
-  };
-
-  const handlePackageChange = (packageId: string) => {
-    const selectedPackage = packages.find(pkg => pkg.id === packageId);
-    if (selectedPackage) {
-      setFormData(prev => ({
-        ...prev,
-        packageId,
-        packageName: selectedPackage.name,
-        monthlyFee: selectedPackage.price
+        odp_id: null,
+        latitude: null,
+        longitude: null,
       }));
     }
   };
@@ -406,19 +251,60 @@ const Customers: React.FC = () => {
     }
   };
 
+  // Filter customers
   const filteredCustomers = customers.filter(customer => {
-    const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         customer.customerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         customer.phone.includes(searchTerm) ||
-                         customer.odpName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = 
+      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.phone.includes(searchTerm) ||
+      customer.address.toLowerCase().includes(searchTerm.toLowerCase());
+    
     const matchesStatus = filterStatus === 'all' || customer.status === filterStatus;
-    const matchesOdp = filterOdp === 'all' || customer.odpId === filterOdp;
+    const matchesOdp = filterOdp === 'all' || customer.odp_id === parseInt(filterOdp);
+    
     return matchesSearch && matchesStatus && matchesOdp;
   });
 
   const openGoogleMaps = (address: string) => {
     window.open(`https://www.google.com/maps?q=${encodeURIComponent(address)}`, '_blank');
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <Layout>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <span className="ml-3 text-gray-600">Memuat data pelanggan...</span>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <Layout>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <div className="flex items-center">
+              <AlertCircle className="w-6 h-6 text-red-600 mr-2" />
+              <h3 className="text-lg font-medium text-red-800">Terjadi Kesalahan</h3>
+            </div>
+            <p className="mt-2 text-red-700">{error}</p>
+            <button
+              onClick={fetchData}
+              className="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Coba Lagi
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -435,6 +321,52 @@ const Customers: React.FC = () => {
           </button>
         </div>
 
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center">
+              <User className="w-8 h-8 text-blue-600 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Pelanggan</p>
+                <p className="text-2xl font-bold text-gray-900">{customers.length}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center">
+              <CheckCircle className="w-8 h-8 text-green-600 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">Aktif</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {customers.filter(c => c.status === 'active').length}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center">
+              <AlertCircle className="w-8 h-8 text-yellow-600 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {customers.filter(c => c.status === 'pending').length}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center">
+              <XCircle className="w-8 h-8 text-red-600 mr-3" />
+              <div>
+                <p className="text-sm font-medium text-gray-600">Non-Aktif</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {customers.filter(c => c.status === 'inactive').length}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -446,7 +378,7 @@ const Customers: React.FC = () => {
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Nama, ID, Telepon, atau ODP..."
+                  placeholder="Nama, email, telepon, atau alamat..."
                   className="pl-10 pr-3 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -504,7 +436,7 @@ const Customers: React.FC = () => {
                   <User className="w-6 h-6 text-blue-600 mr-2" />
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">{customer.name}</h3>
-                    <p className="text-sm text-gray-500">{customer.customerId}</p>
+                    <p className="text-sm text-gray-500">{customer.email}</p>
                   </div>
                 </div>
                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(customer.status)}`}>
@@ -516,21 +448,23 @@ const Customers: React.FC = () => {
                 <div className="flex items-center text-sm text-gray-600">
                   <Network className="w-4 h-4 mr-2" />
                   <span className="font-medium">ODP:</span>
-                  <span className="ml-1">{customer.odpName}</span>
-                  <span className="ml-2 text-blue-600 font-medium">(Port {customer.odcPort})</span>
+                  <span className="ml-1">
+                    {odps.find(o => o.id === customer.odp_id)?.name || 'Tidak diketahui'}
+                  </span>
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <Package className="w-4 h-4 mr-2" />
                   <span className="font-medium">Paket:</span>
-                  <span className="ml-1">{customer.packageName}</span>
+                  <span className="ml-1">
+                    {packages.find(p => p.id === customer.package_id)?.name || 'Tidak diketahui'}
+                  </span>
                 </div>
                 <p className="text-sm text-gray-600">
                   <span className="font-medium">Telepon:</span> {customer.phone}
                 </p>
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span><span className="font-medium">Biaya:</span> Rp {customer.monthlyFee.toLocaleString()}</span>
-                  <span><span className="font-medium">Daftar:</span> {customer.registrationDate}</span>
-                </div>
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">Alamat:</span> {customer.address}
+                </p>
               </div>
               
               <div className="flex justify-between items-center">
@@ -542,13 +476,15 @@ const Customers: React.FC = () => {
                     <MapPin className="w-4 h-4 mr-1" />
                     Google Maps
                   </button>
-                  <button
-                    onClick={() => alert(`Koordinat: ${customer.coordinates.lat.toFixed(6)}, ${customer.coordinates.lng.toFixed(6)}`)}
-                    className="text-green-600 hover:text-green-800 text-sm flex items-center"
-                  >
-                    <MapPin className="w-4 h-4 mr-1" />
-                    Koordinat
-                  </button>
+                  {customer.latitude && customer.longitude && (
+                    <button
+                      onClick={() => alert(`Koordinat: ${customer.latitude?.toFixed(6)}, ${customer.longitude?.toFixed(6)}`)}
+                      className="text-green-600 hover:text-green-800 text-sm flex items-center"
+                    >
+                      <MapPin className="w-4 h-4 mr-1" />
+                      Koordinat
+                    </button>
+                  )}
                 </div>
                 <div className="flex space-x-2">
                   <button
@@ -558,7 +494,7 @@ const Customers: React.FC = () => {
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => handleDelete(customer.id)}
+                    onClick={() => handleDelete(customer.id!)}
                     className="bg-red-500 text-white p-2 rounded hover:bg-red-600 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -589,206 +525,122 @@ const Customers: React.FC = () => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">ID Pelanggan</label>
-                      <input
-                        type="text"
-                        value={formData.customerId}
-                        onChange={(e) => setFormData(prev => ({ ...prev, customerId: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Contoh: CUST-001 (Opsional)"
-                      />
-                    </div>
-                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap *</label>
                       <input
                         type="text"
-                        required
-                        value={formData.name}
+                        value={formData.name || ''}
                         onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Nama lengkap pelanggan"
+                        required
                       />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                       <input
                         type="email"
-                        required
-                        value={formData.email}
+                        value={formData.email || ''}
                         onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="email@contoh.com"
+                        required
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Telepon *</label>
                       <input
                         type="tel"
-                        required
-                        value={formData.phone}
+                        value={formData.phone || ''}
                         onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="081234567890"
+                        required
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      <select
+                        value={formData.status || 'pending'}
+                        onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="active">Aktif</option>
+                        <option value="inactive">Non-Aktif</option>
+                        <option value="suspended">Suspended</option>
+                      </select>
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Alamat Lengkap *</label>
                     <textarea
-                      required
-                      value={formData.address}
+                      value={formData.address || ''}
                       onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                      rows={3}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      rows={2}
-                      placeholder="Alamat lengkap instalasi"
+                      required
                     />
                   </div>
 
-                  {/* Peta Lokasi */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Lokasi di Peta</label>
-                    <MapPicker
-                      value={formData.coordinates}
-                      onChange={(location) => setFormData(prev => ({ 
-                        ...prev, 
-                        coordinates: location,
-                        address: location.address || prev.address || ''
-                      }))}
-                      height="300px"
-                      center={[-6.2088, 106.8456]}
-                      zoom={13}
-                    />
-                  </div>
-
-                  <div className="border-t border-gray-200 pt-4">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Informasi Jaringan</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">ODP *</label>
-                        <select
-                          required
-                          value={formData.odpId}
-                          onChange={(e) => handleOdpChange(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="">Pilih ODP</option>
-                          {odps.map((odp) => (
-                            <option key={odp.id} value={odp.id}>
-                              {odp.name} - {odp.location} ({odp.usedPorts}/{odp.capacity} terpakai)
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Port ODP *</label>
-                        <select
-                          required
-                          value={formData.odcPort}
-                          onChange={(e) => setFormData(prev => ({ ...prev, odcPort: parseInt(e.target.value) }))}
-                          disabled={!formData.odpId}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          <option value="">Pilih Port</option>
-                          {availablePorts.map((port) => (
-                            <option key={port} value={port}>
-                              Port {port}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {selectedOdpDetails && (
-                      <div className="mt-2 p-3 bg-blue-50 rounded-lg">
-                        <p className="text-sm text-blue-700">
-                          <strong>ODP Terpilih:</strong> {selectedOdpDetails.name}<br/>
-                          <strong>Lokasi:</strong> {selectedOdpDetails.location}<br/>
-                          <strong>Kapasitas:</strong> {selectedOdpDetails.usedPorts}/{selectedOdpDetails.capacity} terpakai
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="border-t border-gray-200 pt-4">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Paket Layanan</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Paket *</label>
-                        <select
-                          required
-                          value={formData.packageId}
-                          onChange={(e) => handlePackageChange(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="">Pilih Paket</option>
-                          {packages.map((pkg) => (
-                            <option key={pkg.id} value={pkg.id}>
-                              {pkg.name} - {pkg.speed} (Rp {pkg.price.toLocaleString()})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                        <select
-                          value={formData.status}
-                          onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as Customer['status'] }))}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="active">Aktif</option>
-                          <option value="inactive">Non-Aktif</option>
-                          <option value="suspended">Suspended</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {formData.packageId && (
-                      <div className="mt-2 p-3 bg-green-50 rounded-lg">
-                        {packages.filter(pkg => pkg.id === formData.packageId).map(pkg => (
-                          <div key={pkg.id}>
-                            <p className="text-sm text-green-700">
-                              <strong>Paket Terpilih:</strong> {pkg.name}<br/>
-                              <strong>Kecepatan:</strong> {pkg.speed}<br/>
-                              <strong>Biaya:</strong> Rp {pkg.price.toLocaleString()}/bulan<br/>
-                              <strong>Deskripsi:</strong> {pkg.description}
-                            </p>
-                          </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">ODP *</label>
+                      <select
+                        value={formData.odp_id || ''}
+                        onChange={(e) => handleOdpChange(e.target.value ? parseInt(e.target.value) : null)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="">Pilih ODP</option>
+                        {odps.map((odp) => (
+                          <option key={odp.id} value={odp.id}>
+                            {odp.name} - {odp.location}
+                          </option>
                         ))}
-                      </div>
-                    )}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Paket Layanan *</label>
+                      <select
+                        value={formData.package_id || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, package_id: e.target.value ? parseInt(e.target.value) : null }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="">Pilih Paket</option>
+                        {packages.map((pkg) => (
+                          <option key={pkg.id} value={pkg.id}>
+                            {pkg.name} - {pkg.speed} (Rp {pkg.price.toLocaleString()})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Catatan</label>
                     <textarea
-                      value={formData.notes}
+                      value={formData.notes || ''}
                       onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       rows={2}
-                      placeholder="Catatan tambahan (opsional)"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Catatan tambahan..."
                     />
                   </div>
-                  
-                  <div className="flex justify-end space-x-3 pt-4">
+
+                  <div className="flex justify-end space-x-4">
                     <button
                       type="button"
                       onClick={resetForm}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      disabled={submitting}
                     >
                       Batal
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                      disabled={submitting}
                     >
-                      {editingCustomer ? 'Update' : 'Aktivasi'} Pelanggan
+                      {submitting ? 'Menyimpan...' : (editingCustomer ? 'Update' : 'Simpan')}
                     </button>
                   </div>
                 </form>

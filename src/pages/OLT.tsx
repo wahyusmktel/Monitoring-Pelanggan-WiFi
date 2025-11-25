@@ -1,133 +1,147 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Plus, Edit, Trash2, MapPin, Wifi, Router, Search, X } from 'lucide-react';
-
-interface OLT {
-  id: string;
-  name: string;
-  ipAddress: string;
-  location: string;
-  latitude: number;
-  longitude: number;
-  status: 'active' | 'inactive' | 'maintenance';
-  ports: number;
-  usedPorts: number;
-  brand: string;
-  model: string;
-  description?: string;
-}
+import { oltService, OLT as OLTType, OLTCreate, OLTUpdate } from '@/services/oltService';
+import { toast } from 'sonner';
 
 const OLTPage: React.FC = () => {
-  const [olts, setOlts] = useState<OLT[]>([
-    {
-      id: '1',
-      name: 'OLT-Central-01',
-      ipAddress: '192.168.1.10',
-      location: 'Jl. Merdeka No. 1, Jakarta',
-      latitude: -6.2088,
-      longitude: 106.8456,
-      status: 'active',
-      ports: 128,
-      usedPorts: 85,
-      brand: 'Huawei',
-      model: 'MA5800-X17',
-      description: 'OLT utama untuk area pusat Jakarta'
-    },
-    {
-      id: '2',
-      name: 'OLT-North-02',
-      ipAddress: '192.168.1.11',
-      location: 'Jl. Sudirman No. 45, Jakarta',
-      latitude: -6.2024,
-      longitude: 106.8205,
-      status: 'active',
-      ports: 64,
-      usedPorts: 42,
-      brand: 'ZTE',
-      model: 'C300',
-      description: 'OLT untuk area bisnis Jakarta'
-    }
-  ]);
+  const [olts, setOlts] = useState<OLTType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
 
   const [showForm, setShowForm] = useState(false);
-  const [editingOlt, setEditingOlt] = useState<OLT | null>(null);
+  const [editingOlt, setEditingOlt] = useState<OLTType | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showMap, setShowMap] = useState(false);
 
-  const [formData, setFormData] = useState<Partial<OLT>>({
+  const [formData, setFormData] = useState<Partial<OLTCreate>>({
     name: '',
-    ipAddress: '',
+    ip_address: '',
     location: '',
-    latitude: 0,
-    longitude: 0,
+    latitude: null,
+    longitude: null,
     status: 'active',
-    ports: 128,
-    usedPorts: 0,
+    total_ports: 128,
+    used_ports: 0,
     brand: '',
     model: '',
-    description: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fetch OLT data
+  const fetchOlts = async () => {
+    try {
+      setLoading(true);
+      const response = await oltService.getAll(currentPage, 12, searchTerm, filterStatus === 'all' ? undefined : filterStatus);
+      setOlts(response.data);
+      setTotalItems(response.total);
+      setTotalPages(Math.ceil(response.total / response.size));
+    } catch (error) {
+      toast.error('Gagal memuat data OLT');
+      console.error('Error fetching OLTs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOlts();
+  }, [currentPage, searchTerm, filterStatus]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editingOlt) {
-      // Update existing OLT
-      setOlts(prev => prev.map(olt => 
-        olt.id === editingOlt.id 
-          ? { ...olt, ...formData } as OLT
-          : olt
-      ));
-    } else {
-      // Add new OLT
-      const newOlt: OLT = {
-        id: Date.now().toString(),
-        name: formData.name || '',
-        ipAddress: formData.ipAddress || '',
-        location: formData.location || '',
-        latitude: formData.latitude || 0,
-        longitude: formData.longitude || 0,
-        status: formData.status || 'active',
-        ports: formData.ports || 128,
-        usedPorts: formData.usedPorts || 0,
-        brand: formData.brand || '',
-        model: formData.model || '',
-        description: formData.description
-      };
-      setOlts(prev => [...prev, newOlt]);
+    try {
+      if (editingOlt) {
+        // Update existing OLT
+        const updateData: OLTUpdate = {
+          name: formData.name,
+          ip_address: formData.ip_address,
+          location: formData.location,
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          status: formData.status,
+          total_ports: formData.total_ports,
+          used_ports: formData.used_ports,
+          brand: formData.brand,
+          model: formData.model,
+        };
+        
+        await oltService.update(editingOlt.id, updateData);
+        toast.success('OLT berhasil diperbarui');
+      } else {
+        // Add new OLT
+        const createData: OLTCreate = {
+          name: formData.name || '',
+          ip_address: formData.ip_address || '',
+          location: formData.location || '',
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          status: formData.status || 'active',
+          total_ports: formData.total_ports || 128,
+          used_ports: formData.used_ports || 0,
+          brand: formData.brand || '',
+          model: formData.model || '',
+        };
+        
+        await oltService.create(createData);
+        toast.success('OLT berhasil ditambahkan');
+      }
+      
+      fetchOlts();
+      resetForm();
+    } catch (error) {
+      toast.error(editingOlt ? 'Gagal memperbarui OLT' : 'Gagal menambahkan OLT');
+      console.error('Error saving OLT:', error);
     }
-    
-    resetForm();
   };
 
   const resetForm = () => {
     setFormData({
       name: '',
-      ipAddress: '',
+      ip_address: '',
       location: '',
-      latitude: 0,
-      longitude: 0,
+      latitude: null,
+      longitude: null,
       status: 'active',
-      ports: 128,
-      usedPorts: 0,
+      total_ports: 128,
+      used_ports: 0,
       brand: '',
       model: '',
-      description: ''
     });
     setShowForm(false);
     setEditingOlt(null);
   };
 
-  const handleEdit = (olt: OLT) => {
+  const handleEdit = (olt: OLTType) => {
     setEditingOlt(olt);
-    setFormData(olt);
+    setFormData({
+      name: olt.name,
+      ip_address: olt.ip_address,
+      location: olt.location,
+      latitude: olt.latitude,
+      longitude: olt.longitude,
+      status: olt.status,
+      total_ports: olt.total_ports,
+      used_ports: olt.used_ports,
+      brand: olt.brand,
+      model: olt.model,
+    });
     setShowForm(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: number) => {
     if (confirm('Apakah Anda yakin ingin menghapus OLT ini?')) {
-      setOlts(prev => prev.filter(olt => olt.id !== id));
+      try {
+        await oltService.delete(id);
+        toast.success('OLT berhasil dihapus');
+        fetchOlts();
+      } catch (error) {
+        toast.error('Gagal menghapus OLT');
+        console.error('Error deleting OLT:', error);
+      }
     }
   };
 
@@ -149,13 +163,8 @@ const OLTPage: React.FC = () => {
     }
   };
 
-  const filteredOlts = olts.filter(olt => {
-    const matchesSearch = olt.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         olt.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         olt.ipAddress.includes(searchTerm);
-    const matchesStatus = filterStatus === 'all' || olt.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
+  // No need for local filtering since we're using API filtering
+  const filteredOlts = olts;
 
   const openGoogleMaps = (latitude: number, longitude: number) => {
     window.open(`https://www.google.com/maps?q=${latitude},${longitude}`, '_blank');
@@ -228,9 +237,18 @@ const OLTPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-2 text-gray-600">Memuat data OLT...</span>
+          </div>
+        )}
+
         {/* OLT Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {filteredOlts.map((olt) => (
+        {!loading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            {filteredOlts.map((olt) => (
             <div key={olt.id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center">
@@ -244,7 +262,7 @@ const OLTPage: React.FC = () => {
               
               <div className="space-y-2 mb-4">
                 <p className="text-sm text-gray-600">
-                  <span className="font-medium">IP:</span> {olt.ipAddress}
+                  <span className="font-medium">IP:</span> {olt.ip_address}
                 </p>
                 <p className="text-sm text-gray-600">
                   <span className="font-medium">Lokasi:</span> {olt.location}
@@ -253,19 +271,19 @@ const OLTPage: React.FC = () => {
                   <span className="font-medium">Brand:</span> {olt.brand} {olt.model}
                 </p>
                 <p className="text-sm text-gray-600">
-                  <span className="font-medium">Port:</span> {olt.usedPorts}/{olt.ports} digunakan
+                  <span className="font-medium">Port:</span> {olt.used_ports}/{olt.total_ports} digunakan
                 </p>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-blue-600 h-2 rounded-full" 
-                    style={{ width: `${(olt.usedPorts / olt.ports) * 100}%` }}
+                    style={{ width: `${(olt.used_ports / olt.total_ports) * 100}%` }}
                   ></div>
                 </div>
               </div>
               
               <div className="flex justify-between items-center">
                 <button
-                  onClick={() => openGoogleMaps(olt.latitude, olt.longitude)}
+                  onClick={() => openGoogleMaps(olt.latitude || 0, olt.longitude || 0)}
                   className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
                 >
                   <MapPin className="w-4 h-4 mr-1" />
@@ -288,13 +306,37 @@ const OLTPage: React.FC = () => {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
 
-        {filteredOlts.length === 0 && (
+        {!loading && filteredOlts.length === 0 && (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <Router className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">Tidak ada data OLT</h3>
             <p className="text-gray-600">Tambahkan data OLT untuk memulai.</p>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!loading && totalPages > 1 && (
+          <div className="flex justify-center items-center space-x-2 mt-8">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Sebelumnya
+            </button>
+            <span className="px-4 py-2 text-gray-700">
+              Halaman {currentPage} dari {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              Selanjutnya
+            </button>
           </div>
         )}
 
@@ -325,8 +367,8 @@ const OLTPage: React.FC = () => {
                       <input
                         type="text"
                         required
-                        value={formData.ipAddress}
-                        onChange={(e) => setFormData(prev => ({ ...prev, ipAddress: e.target.value }))}
+                        value={formData.ip_address}
+                        onChange={(e) => setFormData(prev => ({ ...prev, ip_address: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Contoh: 192.168.1.10"
                       />
@@ -347,25 +389,23 @@ const OLTPage: React.FC = () => {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Latitude *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
                       <input
                         type="number"
-                        required
                         step="0.000001"
-                        value={formData.latitude}
-                        onChange={(e) => setFormData(prev => ({ ...prev, latitude: parseFloat(e.target.value) }))}
+                        value={formData.latitude || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, latitude: e.target.value ? parseFloat(e.target.value) : null }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Contoh: -6.2088"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Longitude *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
                       <input
                         type="number"
-                        required
                         step="0.000001"
-                        value={formData.longitude}
-                        onChange={(e) => setFormData(prev => ({ ...prev, longitude: parseFloat(e.target.value) }))}
+                        value={formData.longitude || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, longitude: e.target.value ? parseFloat(e.target.value) : null }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Contoh: 106.8456"
                       />
@@ -402,7 +442,7 @@ const OLTPage: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
                       <select
                         value={formData.status}
-                        onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as OLT['status'] }))}
+                        onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
                         <option value="active">Aktif</option>
@@ -416,8 +456,8 @@ const OLTPage: React.FC = () => {
                         type="number"
                         required
                         min="1"
-                        value={formData.ports}
-                        onChange={(e) => setFormData(prev => ({ ...prev, ports: parseInt(e.target.value) }))}
+                        value={formData.total_ports}
+                        onChange={(e) => setFormData(prev => ({ ...prev, total_ports: parseInt(e.target.value) }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
@@ -427,24 +467,15 @@ const OLTPage: React.FC = () => {
                         type="number"
                         required
                         min="0"
-                        max={formData.ports}
-                        value={formData.usedPorts}
-                        onChange={(e) => setFormData(prev => ({ ...prev, usedPorts: parseInt(e.target.value) }))}
+                        max={formData.total_ports}
+                        value={formData.used_ports}
+                        onChange={(e) => setFormData(prev => ({ ...prev, used_ports: parseInt(e.target.value) }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
                   </div>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi</label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      rows={3}
-                      placeholder="Deskripsi tambahan (opsional)"
-                    />
-                  </div>
+                  {/* Description field removed - not in API schema */}
                   
                   <div className="flex justify-end space-x-3 pt-4">
                     <button
@@ -490,7 +521,7 @@ const OLTPage: React.FC = () => {
                       {olts.map((olt) => (
                         <button
                           key={olt.id}
-                          onClick={() => openGoogleMaps(olt.latitude, olt.longitude)}
+                          onClick={() => openGoogleMaps(olt.latitude || 0, olt.longitude || 0)}
                           className="block w-full text-left px-4 py-2 bg-white rounded-lg hover:bg-blue-50 transition-colors"
                         >
                           <div className="flex items-center">
