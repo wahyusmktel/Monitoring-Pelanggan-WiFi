@@ -26,6 +26,9 @@ from .services import (
     get_payment, get_payments, create_payment, update_payment, delete_payment,
     get_overdue_payments, get_payment_summary
 )
+from .settings import (
+    get_settings, update_settings
+)
 
 __all__ = [
     # Customer CRUD
@@ -46,4 +49,7 @@ __all__ = [
     "get_active_subscriptions", "get_expiring_subscriptions",
     "get_payment", "get_payments", "create_payment", "update_payment", "delete_payment",
     "get_overdue_payments", "get_payment_summary"
+    ,
+    # Settings CRUD
+    "get_settings", "update_settings"
 ]

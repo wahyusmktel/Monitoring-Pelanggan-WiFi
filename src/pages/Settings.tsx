@@ -1,10 +1,57 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import { Save, Bell, Shield, Palette, Mail, Phone, MapPin, Globe, Key } from 'lucide-react';
+import settingsService from '@/services/settingsService';
 
 const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState('general');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        setIsLoading(true);
+        const s = await settingsService.getSettings();
+        setGeneralSettings({
+          companyName: s.company_name ?? generalSettings.companyName,
+          companyAddress: s.company_address ?? generalSettings.companyAddress,
+          companyPhone: s.company_phone ?? generalSettings.companyPhone,
+          companyEmail: s.company_email ?? generalSettings.companyEmail,
+          website: s.website ?? generalSettings.website,
+          timezone: s.timezone ?? generalSettings.timezone,
+        });
+        setNotificationSettings({
+          emailNotifications: s.email_notifications ?? notificationSettings.emailNotifications,
+          smsNotifications: s.sms_notifications ?? notificationSettings.smsNotifications,
+          paymentReminders: s.payment_reminders ?? notificationSettings.paymentReminders,
+          maintenanceAlerts: s.maintenance_alerts ?? notificationSettings.maintenanceAlerts,
+          newCustomerAlerts: s.new_customer_alerts ?? notificationSettings.newCustomerAlerts,
+          lowBalanceAlerts: s.low_balance_alerts ?? notificationSettings.lowBalanceAlerts,
+        });
+        setSecuritySettings({
+          twoFactorAuth: s.two_factor_auth ?? securitySettings.twoFactorAuth,
+          sessionTimeout: s.session_timeout ?? securitySettings.sessionTimeout,
+          passwordExpiry: s.password_expiry ?? securitySettings.passwordExpiry,
+          loginAttempts: s.login_attempts ?? securitySettings.loginAttempts,
+          ipWhitelist: s.ip_whitelist ?? securitySettings.ipWhitelist,
+          autoLogout: s.auto_logout ?? securitySettings.autoLogout,
+        });
+        setAppearanceSettings({
+          theme: (s.theme as any) ?? appearanceSettings.theme,
+          primaryColor: s.primary_color ?? appearanceSettings.primaryColor,
+          sidebarColor: s.sidebar_color ?? appearanceSettings.sidebarColor,
+          fontSize: (s.font_size as any) ?? appearanceSettings.fontSize,
+          language: (s.language as any) ?? appearanceSettings.language,
+        });
+      } catch (err) {
+        console.error('Failed to load settings', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [generalSettings, setGeneralSettings] = useState({
     companyName: 'Internet Service Provider',
@@ -49,46 +96,120 @@ const Settings: React.FC = () => {
   ];
 
   const handleSave = async (section: string) => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      setIsLoading(true);
+      let payload: any = {};
+      if (section === 'umum') {
+        payload = {
+          company_name: generalSettings.companyName,
+          company_address: generalSettings.companyAddress,
+          company_phone: generalSettings.companyPhone,
+          company_email: generalSettings.companyEmail,
+          website: generalSettings.website,
+          timezone: generalSettings.timezone,
+        };
+      } else if (section === 'notifikasi') {
+        payload = {
+          email_notifications: notificationSettings.emailNotifications,
+          sms_notifications: notificationSettings.smsNotifications,
+          payment_reminders: notificationSettings.paymentReminders,
+          maintenance_alerts: notificationSettings.maintenanceAlerts,
+          new_customer_alerts: notificationSettings.newCustomerAlerts,
+          low_balance_alerts: notificationSettings.lowBalanceAlerts,
+        };
+      } else if (section === 'keamanan') {
+        payload = {
+          two_factor_auth: securitySettings.twoFactorAuth,
+          session_timeout: securitySettings.sessionTimeout,
+          password_expiry: securitySettings.passwordExpiry,
+          login_attempts: securitySettings.loginAttempts,
+          ip_whitelist: securitySettings.ipWhitelist,
+          auto_logout: securitySettings.autoLogout,
+        };
+      } else if (section === 'tampilan') {
+        payload = {
+          theme: appearanceSettings.theme,
+          primary_color: appearanceSettings.primaryColor,
+          sidebar_color: appearanceSettings.sidebarColor,
+          font_size: appearanceSettings.fontSize,
+          language: appearanceSettings.language,
+        };
+      }
+
+      await settingsService.updateSettings(payload);
       alert(`Pengaturan ${section} berhasil disimpan!`);
-    }, 1500);
+    } catch (err) {
+      alert('Gagal menyimpan pengaturan.');
+      console.error('Save settings error', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleTestNotification = () => {
-    alert('Notifikasi tes telah dikirim!');
+  const handleTestNotification = async () => {
+    try {
+      await settingsService.testNotification();
+      alert('Notifikasi tes telah dikirim!');
+    } catch (err) {
+      alert('Gagal mengirim notifikasi tes');
+    }
   };
 
-  const handleExportData = () => {
-    const data = {
-      general: generalSettings,
-      notifications: notificationSettings,
-      security: securitySettings,
-      appearance: appearanceSettings,
-      exportDate: new Date().toISOString()
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'settings-backup.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExportData = async () => {
+    try {
+      const data = await settingsService.exportSettings();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'settings-backup.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Gagal mengekspor pengaturan');
+    }
   };
 
-  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const data = JSON.parse(e.target?.result as string);
-          if (data.general) setGeneralSettings(data.general);
-          if (data.notifications) setNotificationSettings(data.notifications);
-          if (data.security) setSecuritySettings(data.security);
-          if (data.appearance) setAppearanceSettings(data.appearance);
+          await settingsService.importSettings(data);
+          const s = await settingsService.getSettings();
+          setGeneralSettings({
+            companyName: s.company_name ?? generalSettings.companyName,
+            companyAddress: s.company_address ?? generalSettings.companyAddress,
+            companyPhone: s.company_phone ?? generalSettings.companyPhone,
+            companyEmail: s.company_email ?? generalSettings.companyEmail,
+            website: s.website ?? generalSettings.website,
+            timezone: s.timezone ?? generalSettings.timezone,
+          });
+          setNotificationSettings({
+            emailNotifications: s.email_notifications ?? notificationSettings.emailNotifications,
+            smsNotifications: s.sms_notifications ?? notificationSettings.smsNotifications,
+            paymentReminders: s.payment_reminders ?? notificationSettings.paymentReminders,
+            maintenanceAlerts: s.maintenance_alerts ?? notificationSettings.maintenanceAlerts,
+            newCustomerAlerts: s.new_customer_alerts ?? notificationSettings.newCustomerAlerts,
+            lowBalanceAlerts: s.low_balance_alerts ?? notificationSettings.lowBalanceAlerts,
+          });
+          setSecuritySettings({
+            twoFactorAuth: s.two_factor_auth ?? securitySettings.twoFactorAuth,
+            sessionTimeout: s.session_timeout ?? securitySettings.sessionTimeout,
+            passwordExpiry: s.password_expiry ?? securitySettings.passwordExpiry,
+            loginAttempts: s.login_attempts ?? securitySettings.loginAttempts,
+            ipWhitelist: s.ip_whitelist ?? securitySettings.ipWhitelist,
+            autoLogout: s.auto_logout ?? securitySettings.autoLogout,
+          });
+          setAppearanceSettings({
+            theme: (s.theme as any) ?? appearanceSettings.theme,
+            primaryColor: s.primary_color ?? appearanceSettings.primaryColor,
+            sidebarColor: s.sidebar_color ?? appearanceSettings.sidebarColor,
+            fontSize: (s.font_size as any) ?? appearanceSettings.fontSize,
+            language: (s.language as any) ?? appearanceSettings.language,
+          });
           alert('Pengaturan berhasil diimpor!');
         } catch (error) {
           alert('Gagal mengimpor file. Pastikan format file benar.');

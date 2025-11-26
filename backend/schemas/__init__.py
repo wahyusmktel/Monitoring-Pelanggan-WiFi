@@ -9,6 +9,9 @@ from .services import (
     Subscription, SubscriptionCreate, SubscriptionUpdate,
     Payment, PaymentCreate, PaymentUpdate
 )
+from .settings import (
+    Settings, SettingsUpdate
+)
 
 __all__ = [
     # Customer schemas
@@ -23,4 +26,7 @@ __all__ = [
     "Package", "PackageCreate", "PackageUpdate",
     "Subscription", "SubscriptionCreate", "SubscriptionUpdate",
     "Payment", "PaymentCreate", "PaymentUpdate"
+    ,
+    # Settings schemas
+    "Settings", "SettingsUpdate"
 ]

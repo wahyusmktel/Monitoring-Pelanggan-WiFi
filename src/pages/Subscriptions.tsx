@@ -1,22 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import { Plus, Edit, Trash2, Search, Filter, Package, DollarSign, Wifi, Users, Clock, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Filter, Package as PackageIcon, DollarSign, Wifi, Users, Clock, AlertCircle } from 'lucide-react';
+import { servicesService, PackageCreate } from '@/services/servicesService'; // Import service
+import { toast } from 'sonner'; // Pakai toast biar keren
 
-// Interface untuk Paket Langganan
+// Interface disamakan dengan backend response
 interface Package {
-  id: string;
+  id: number; // Backend ID number
   name: string;
   description: string;
-  speed: number; // Mbps
-  quota: number; // GB (0 untuk unlimited)
-  price: number; // Rupiah
-  duration: number; // dalam hari (30 untuk bulanan)
-  isActive: boolean;
+  speed: number;
+  quota: number;
+  price: number;
+  duration: number;
+  is_active: boolean; // Backend pake snake_case
   features: string[];
   category: 'basic' | 'standard' | 'premium' | 'enterprise';
-  maxDevices: number;
-  setupFee: number;
-  color: string;
+  max_devices: number; // Backend snake_case
+  setup_fee: number; // Backend snake_case
+  color?: string;
 }
 
 // Interface untuk Form
@@ -35,68 +37,8 @@ interface PackageForm {
 
 const Subscriptions: React.FC = () => {
   // State untuk data paket
-  const [packages, setPackages] = useState<Package[]>([
-    {
-      id: '1',
-      name: 'Paket Basic',
-      description: 'Paket internet dasar untuk kebutuhan sehari-hari',
-      speed: 10,
-      quota: 0,
-      price: 150000,
-      duration: 30,
-      isActive: true,
-      features: ['Kecepatan 10 Mbps', 'Kuota Unlimited', 'Support 24/7'],
-      category: 'basic',
-      maxDevices: 3,
-      setupFee: 50000,
-      color: 'blue'
-    },
-    {
-      id: '2',
-      name: 'Paket Standard',
-      description: 'Paket internet menengah untuk keluarga kecil',
-      speed: 20,
-      quota: 0,
-      price: 250000,
-      duration: 30,
-      isActive: true,
-      features: ['Kecepatan 20 Mbps', 'Kuota Unlimited', 'Support 24/7', 'Free WiFi Router'],
-      category: 'standard',
-      maxDevices: 5,
-      setupFee: 75000,
-      color: 'green'
-    },
-    {
-      id: '3',
-      name: 'Paket Premium',
-      description: 'Paket internet premium untuk keluarga besar',
-      speed: 50,
-      quota: 0,
-      price: 400000,
-      duration: 30,
-      isActive: true,
-      features: ['Kecepatan 50 Mbps', 'Kuota Unlimited', 'Support Prioritas', 'Free WiFi Router', 'Free Instalasi'],
-      category: 'premium',
-      maxDevices: 8,
-      setupFee: 0,
-      color: 'purple'
-    },
-    {
-      id: '4',
-      name: 'Paket Enterprise',
-      description: 'Paket internet untuk bisnis dan kantor',
-      speed: 100,
-      quota: 0,
-      price: 800000,
-      duration: 30,
-      isActive: true,
-      features: ['Kecepatan 100 Mbps', 'Kuota Unlimited', 'Support Prioritas', 'Dedicated Line', 'SLA 99.9%'],
-      category: 'enterprise',
-      maxDevices: 15,
-      setupFee: 150000,
-      color: 'red'
-    }
-  ]);
+  const [packages, setPackages] = useState<Package[]>([]);
+  const [loading, setLoading] = useState(true); // Loading state
 
   // State untuk form dan modal
   const [showModal, setShowModal] = useState(false);
@@ -124,14 +66,39 @@ const Subscriptions: React.FC = () => {
   // State untuk error
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+  // Fetch Data dari API saat komponen dimuat
+  const fetchPackages = async () => {
+    try {
+      setLoading(true);
+      const data = await servicesService.getPackages();
+      
+      // Mapping data backend (snake_case) ke frontend (kalau perlu, atau pakai langsung)
+      // Karena di Interface Package di atas sudah kita sesuaikan, bisa langsung set
+      // Tapi pastikan tipe datanya cocok.
+      // Backend return: id, name, ..., is_active, max_devices
+      // Frontend butuh: color (opsional, ada di append backend)
+      
+      setPackages(data as unknown as Package[]); // Type assertion aman karena strukturnya mirip
+    } catch (error) {
+      toast.error('Gagal memuat data paket');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPackages();
+  }, []);
+
   // Filter dan search packages
   const filteredPackages = packages.filter(pkg => {
     const matchesSearch = pkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         pkg.description.toLowerCase().includes(searchTerm.toLowerCase());
+                          (pkg.description ? pkg.description.toLowerCase().includes(searchTerm.toLowerCase()) : false);
     const matchesCategory = filterCategory === 'all' || pkg.category === filterCategory;
     const matchesStatus = filterStatus === 'all' || 
-                         (filterStatus === 'active' && pkg.isActive) ||
-                         (filterStatus === 'inactive' && !pkg.isActive);
+                          (filterStatus === 'active' && pkg.is_active) ||
+                          (filterStatus === 'inactive' && !pkg.is_active);
     
     return matchesSearch && matchesCategory && matchesStatus;
   }).sort((a, b) => {
@@ -182,36 +149,43 @@ const Subscriptions: React.FC = () => {
   };
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) {
-      return;
-    }
-    
-    const newPackage: Package = {
-      id: isEditing && editingPackage ? editingPackage.id : Date.now().toString(),
+    if (!validateForm()) return;
+
+    // Siapkan payload sesuai struktur backend (snake_case)
+    const payload = {
       name: formData.name,
       description: formData.description,
-      speed: formData.speed,
-      quota: formData.quota,
+      speed: Number(formData.speed), // Perlu convert ke string sesuai interface
+      quota: formData.quota, // Perlu handle number vs string conversion jika perlu
       price: formData.price,
       duration: formData.duration,
-      isActive: true,
       features: formData.features.filter(f => f.trim() !== ''),
       category: formData.category,
-      maxDevices: formData.maxDevices,
-      setupFee: formData.setupFee,
-      color: getCategoryColor(formData.category)
+      max_devices: Number(formData.maxDevices),
+      setup_fee: Number(formData.setupFee),     // Perhatikan camelCase ke snake_case mapping di backend
+      is_active: true
     };
-    
-    if (isEditing && editingPackage) {
-      setPackages(packages.map(pkg => pkg.id === editingPackage.id ? newPackage : pkg));
-    } else {
-      setPackages([...packages, newPackage]);
+
+    try {
+      if (isEditing && editingPackage) {
+        // @ts-ignore - Partial update properties mismatch
+        await servicesService.updatePackage(editingPackage.id, payload);
+        toast.success('Paket berhasil diperbarui');
+      } else {
+        // @ts-ignore - Type mismatch handling
+        await servicesService.createPackage(payload);
+        toast.success('Paket berhasil ditambahkan');
+      }
+      
+      fetchPackages(); // Refresh data
+      closeModal();
+    } catch (error) {
+      toast.error('Gagal menyimpan paket');
+      console.error(error);
     }
-    
-    closeModal();
   };
 
   // Get color based on category
@@ -230,32 +204,45 @@ const Subscriptions: React.FC = () => {
     setEditingPackage(pkg);
     setFormData({
       name: pkg.name,
-      description: pkg.description,
-      speed: pkg.speed,
+      description: pkg.description || '',
+      speed: Number(pkg.speed),
       quota: pkg.quota,
       price: pkg.price,
       duration: pkg.duration,
-      features: pkg.features.length > 0 ? pkg.features : [''],
+      features: pkg.features && pkg.features.length > 0 ? pkg.features : [''],
       category: pkg.category,
-      maxDevices: pkg.maxDevices,
-      setupFee: pkg.setupFee
+      maxDevices: pkg.max_devices,
+      setupFee: pkg.setup_fee
     });
     setIsEditing(true);
     setShowModal(true);
   };
 
   // Handle delete
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: number) => {
     if (window.confirm('Apakah Anda yakin ingin menghapus paket ini?')) {
-      setPackages(packages.filter(pkg => pkg.id !== id));
+      try {
+        await servicesService.deletePackage(id);
+        toast.success('Paket berhasil dihapus');
+        fetchPackages();
+      } catch (error) {
+        toast.error('Gagal menghapus paket');
+      }
     }
   };
 
   // Toggle package status
-  const togglePackageStatus = (id: string) => {
-    setPackages(packages.map(pkg => 
-      pkg.id === id ? { ...pkg, isActive: !pkg.isActive } : pkg
-    ));
+  const togglePackageStatus = async (pkg: Package) => {
+    try {
+      await servicesService.updatePackage(pkg.id, {
+        // @ts-ignore - partial update
+        is_active: !pkg.is_active 
+      });
+      toast.success(`Paket ${!pkg.is_active ? 'diaktifkan' : 'dinonaktifkan'}`);
+      fetchPackages();
+    } catch (error) {
+      toast.error('Gagal mengubah status paket');
+    }
   };
 
   // Handle feature change
@@ -298,9 +285,9 @@ const Subscriptions: React.FC = () => {
 
   // Statistics
   const totalPackages = packages.length;
-  const activePackages = packages.filter(pkg => pkg.isActive).length;
-  const totalRevenue = packages.reduce((sum, pkg) => sum + (pkg.isActive ? pkg.price : 0), 0);
-  const avgPackagePrice = packages.length > 0 ? Math.round(packages.reduce((sum, pkg) => sum + pkg.price, 0) / packages.length) : 0;
+  const activePackages = packages.filter(pkg => pkg.is_active).length;
+  const totalRevenue = packages.reduce((sum, pkg) => sum + (pkg.is_active ? Number(pkg.price) : 0), 0);
+  const avgPackagePrice = packages.length > 0 ? Math.round(packages.reduce((sum, pkg) => sum + Number(pkg.price), 0) / packages.length) : 0;
 
   return (
     <Layout>
@@ -325,7 +312,7 @@ const Subscriptions: React.FC = () => {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center">
               <div className="bg-blue-100 p-3 rounded-lg">
-                <Package className="w-6 h-6 text-blue-600" />
+                <PackageIcon className="w-6 h-6 text-blue-600" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Paket</p>
@@ -431,105 +418,115 @@ const Subscriptions: React.FC = () => {
           </div>
         </div>
 
-        {/* Package List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPackages.map((pkg) => (
-            <div key={pkg.id} className={`bg-white rounded-lg shadow-md overflow-hidden border-l-4 border-${pkg.color}-500`}>
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{pkg.name}</h3>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      pkg.category === 'basic' ? 'bg-blue-100 text-blue-800' :
-                      pkg.category === 'standard' ? 'bg-green-100 text-green-800' :
-                      pkg.category === 'premium' ? 'bg-purple-100 text-purple-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {pkg.category.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleEdit(pkg)}
-                      className="text-blue-600 hover:text-blue-800 p-1"
-                      title="Edit Paket"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(pkg.id)}
-                      className="text-red-600 hover:text-red-800 p-1"
-                      title="Hapus Paket"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <p className="text-gray-600 text-sm mb-4">{pkg.description}</p>
-
-                <div className="space-y-2 mb-4">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Kecepatan:</span>
-                    <span className="text-sm font-medium">{pkg.speed} Mbps</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Kuota:</span>
-                    <span className="text-sm font-medium">{pkg.quota === 0 ? 'Unlimited' : `${pkg.quota} GB`}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Perangkat:</span>
-                    <span className="text-sm font-medium">{pkg.maxDevices} device</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Durasi:</span>
-                    <span className="text-sm font-medium">{pkg.duration} hari</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Biaya Setup:</span>
-                    <span className="text-sm font-medium">Rp {pkg.setupFee.toLocaleString('id-ID')}</span>
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Fitur:</h4>
-                  <ul className="text-sm text-gray-600 space-y-1">
-                    {pkg.features.map((feature, index) => (
-                      <li key={index} className="flex items-center">
-                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2"></div>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-2xl font-bold text-blue-600">Rp {pkg.price.toLocaleString('id-ID')}</p>
-                    <p className="text-sm text-gray-500">/ {pkg.duration} hari</p>
-                  </div>
-                  <button
-                    onClick={() => togglePackageStatus(pkg.id)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      pkg.isActive 
-                        ? 'bg-green-100 text-green-800 hover:bg-green-200' 
-                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                    }`}
-                  >
-                    {pkg.isActive ? 'Aktif' : 'Nonaktif'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {filteredPackages.length === 0 && (
-          <div className="text-center py-12">
-            <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Tidak ada paket ditemukan</h3>
-            <p className="text-gray-600">Coba ubah filter pencarian atau tambahkan paket baru.</p>
+        {/* Loading State */}
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-2 text-gray-600">Memuat data paket...</span>
           </div>
+        ) : (
+          <>
+            {/* Package List */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredPackages.map((pkg) => (
+                <div key={pkg.id} className={`bg-white rounded-lg shadow-md overflow-hidden border-l-4 border-${pkg.color || getCategoryColor(pkg.category)}-500`}>
+                  <div className="p-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">{pkg.name}</h3>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          pkg.category === 'basic' ? 'bg-blue-100 text-blue-800' :
+                          pkg.category === 'standard' ? 'bg-green-100 text-green-800' :
+                          pkg.category === 'premium' ? 'bg-purple-100 text-purple-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {pkg.category.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleEdit(pkg)}
+                          className="text-blue-600 hover:text-blue-800 p-1"
+                          title="Edit Paket"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(pkg.id)}
+                          className="text-red-600 hover:text-red-800 p-1"
+                          title="Hapus Paket"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <p className="text-gray-600 text-sm mb-4">{pkg.description}</p>
+
+                    <div className="space-y-2 mb-4">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Kecepatan:</span>
+                        <span className="text-sm font-medium">{pkg.speed} Mbps</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Kuota:</span>
+                        <span className="text-sm font-medium">{pkg.quota === 0 ? 'Unlimited' : `${pkg.quota} GB`}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Perangkat:</span>
+                        <span className="text-sm font-medium">{pkg.max_devices} device</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Durasi:</span>
+                        <span className="text-sm font-medium">{pkg.duration} hari</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Biaya Setup:</span>
+                        <span className="text-sm font-medium">Rp {Number(pkg.setup_fee).toLocaleString('id-ID')}</span>
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Fitur:</h4>
+                      <ul className="text-sm text-gray-600 space-y-1">
+                        {pkg.features && pkg.features.map((feature, index) => (
+                          <li key={index} className="flex items-center">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2"></div>
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-2xl font-bold text-blue-600">Rp {Number(pkg.price).toLocaleString('id-ID')}</p>
+                        <p className="text-sm text-gray-500">/ {pkg.duration} hari</p>
+                      </div>
+                      <button
+                        onClick={() => togglePackageStatus(pkg)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          pkg.is_active 
+                            ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                        }`}
+                      >
+                        {pkg.is_active ? 'Aktif' : 'Nonaktif'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {filteredPackages.length === 0 && (
+              <div className="text-center py-12">
+                <PackageIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Tidak ada paket ditemukan</h3>
+                <p className="text-gray-600">Coba ubah filter pencarian atau tambahkan paket baru.</p>
+              </div>
+            )}
+          </>
         )}
       </div>
 

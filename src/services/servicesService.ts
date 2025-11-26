@@ -81,7 +81,7 @@ export const servicesService = {
   // Package Services
   getPackages: async (): Promise<Package[]> => {
     try {
-      const response = await apiClient.get('/packages');
+      const response = await apiClient.get('/services/packages');
       return response.data;
     } catch (error) {
       console.error('Error fetching packages:', error);
@@ -91,7 +91,7 @@ export const servicesService = {
 
   getPackageById: async (id: number): Promise<Package> => {
     try {
-      const response = await apiClient.get(`/packages/${id}`);
+      const response = await apiClient.get(`/services/packages/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching package ${id}:`, error);
@@ -101,7 +101,7 @@ export const servicesService = {
 
   createPackage: async (pkg: PackageCreate): Promise<Package> => {
     try {
-      const response = await apiClient.post('/packages', pkg);
+      const response = await apiClient.post('/services/packages', pkg);
       return response.data;
     } catch (error) {
       console.error('Error creating package:', error);
@@ -111,7 +111,7 @@ export const servicesService = {
 
   updatePackage: async (id: number, pkg: Partial<PackageCreate>): Promise<Package> => {
     try {
-      const response = await apiClient.put(`/packages/${id}`, pkg);
+      const response = await apiClient.put(`/services/packages/${id}`, pkg);
       return response.data;
     } catch (error) {
       console.error(`Error updating package ${id}:`, error);
@@ -121,7 +121,7 @@ export const servicesService = {
 
   deletePackage: async (id: number): Promise<void> => {
     try {
-      await apiClient.delete(`/packages/${id}`);
+      await apiClient.delete(`/services/packages/${id}`);
     } catch (error) {
       console.error(`Error deleting package ${id}:`, error);
       throw error;
@@ -131,7 +131,7 @@ export const servicesService = {
   // Subscription Services
   getSubscriptions: async (filters?: { customer_id?: number; package_id?: number; status?: string }): Promise<Subscription[]> => {
     try {
-      const response = await apiClient.get('/subscriptions', { params: filters });
+      const response = await apiClient.get('/services/subscriptions', { params: filters });
       return response.data;
     } catch (error) {
       console.error('Error fetching subscriptions:', error);
@@ -141,7 +141,7 @@ export const servicesService = {
 
   getSubscriptionById: async (id: number): Promise<Subscription> => {
     try {
-      const response = await apiClient.get(`/subscriptions/${id}`);
+      const response = await apiClient.get(`/services/subscriptions/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching subscription ${id}:`, error);
@@ -151,7 +151,7 @@ export const servicesService = {
 
   createSubscription: async (subscription: SubscriptionCreate): Promise<Subscription> => {
     try {
-      const response = await apiClient.post('/subscriptions', subscription);
+      const response = await apiClient.post('/services/subscriptions', subscription);
       return response.data;
     } catch (error) {
       console.error('Error creating subscription:', error);
@@ -161,7 +161,7 @@ export const servicesService = {
 
   updateSubscription: async (id: number, subscription: Partial<SubscriptionCreate>): Promise<Subscription> => {
     try {
-      const response = await apiClient.put(`/subscriptions/${id}`, subscription);
+      const response = await apiClient.put(`/services/subscriptions/${id}`, subscription);
       return response.data;
     } catch (error) {
       console.error(`Error updating subscription ${id}:`, error);
@@ -171,7 +171,7 @@ export const servicesService = {
 
   deleteSubscription: async (id: number): Promise<void> => {
     try {
-      await apiClient.delete(`/subscriptions/${id}`);
+      await apiClient.delete(`/services/subscriptions/${id}`);
     } catch (error) {
       console.error(`Error deleting subscription ${id}:`, error);
       throw error;
@@ -181,7 +181,7 @@ export const servicesService = {
   // Payment Services
   getPayments: async (filters?: { customer_id?: number; subscription_id?: number; status?: string }): Promise<Payment[]> => {
     try {
-      const response = await apiClient.get('/payments', { params: filters });
+      const response = await apiClient.get('/services/payments', { params: filters });
       return response.data;
     } catch (error) {
       console.error('Error fetching payments:', error);
@@ -191,7 +191,7 @@ export const servicesService = {
 
   getPaymentById: async (id: number): Promise<Payment> => {
     try {
-      const response = await apiClient.get(`/payments/${id}`);
+      const response = await apiClient.get(`/services/payments/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching payment ${id}:`, error);
@@ -201,7 +201,7 @@ export const servicesService = {
 
   createPayment: async (payment: PaymentCreate): Promise<Payment> => {
     try {
-      const response = await apiClient.post('/payments', payment);
+      const response = await apiClient.post('/services/payments', payment);
       return response.data;
     } catch (error) {
       console.error('Error creating payment:', error);
@@ -211,7 +211,7 @@ export const servicesService = {
 
   updatePayment: async (id: number, payment: Partial<PaymentCreate>): Promise<Payment> => {
     try {
-      const response = await apiClient.put(`/payments/${id}`, payment);
+      const response = await apiClient.put(`/services/payments/${id}`, payment);
       return response.data;
     } catch (error) {
       console.error(`Error updating payment ${id}:`, error);
@@ -221,7 +221,7 @@ export const servicesService = {
 
   deletePayment: async (id: number): Promise<void> => {
     try {
-      await apiClient.delete(`/payments/${id}`);
+      await apiClient.delete(`/services/payments/${id}`);
     } catch (error) {
       console.error(`Error deleting payment ${id}:`, error);
       throw error;

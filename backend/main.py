@@ -6,7 +6,7 @@ import uvicorn
 
 from core.config import settings
 from core.database import engine, Base
-from app import customers, infrastructure, services
+from app import customers, infrastructure, services, settings as app_settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -53,6 +53,7 @@ def health_check():
 app.include_router(customers.router)
 app.include_router(infrastructure.router)
 app.include_router(services.router)
+app.include_router(app_settings.router)
 
 # Global exception handler
 @app.exception_handler(HTTPException)

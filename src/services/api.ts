@@ -1,18 +1,24 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-
-const apiClient = axios.create({
-  baseURL: API_URL,
+// Buat instance axios
+const api = axios.create({
+  // Pastikan URL mengarah ke /api (sesuai setting .env kamu yang baru)
+  baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api',
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json', // Penting agar Laravel merespon dengan JSON jika error
   },
 });
 
-// Request interceptor
-apiClient.interceptors.request.use(
+// --- REQUEST INTERCEPTOR ---
+// Sebelum request dikirim, ambil token dari saku (localStorage)
+api.interceptors.request.use(
   (config) => {
-    // You can add auth tokens here if needed
+    const token = localStorage.getItem('token');
+    if (token) {
+      // Tempelkan token ke Header
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => {
@@ -20,19 +26,21 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor
-apiClient.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+// --- RESPONSE INTERCEPTOR ---
+// Kalau token kadaluarsa atau tidak valid (401), tendang user keluar
+api.interceptors.response.use(
+  (response) => response,
   (error) => {
-    if (error.response?.status === 404) {
-      console.error('Resource not found:', error.response.config.url);
-    } else if (error.response?.status >= 500) {
-      console.error('Server error:', error.response.data);
+    if (error.response && error.response.status === 401) {
+      // Token tidak valid/kadaluarsa
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      
+      // Redirect ke login (opsional, bisa pakai window.location)
+      // window.location.href = '/'; 
     }
     return Promise.reject(error);
   }
 );
 
-export default apiClient;
+export default api;
