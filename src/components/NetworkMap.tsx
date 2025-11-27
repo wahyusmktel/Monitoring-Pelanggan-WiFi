@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -10,7 +10,7 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// --- FIX ICON LEAFLET (Sama seperti di MapPicker) ---
+// --- FIX ICON LEAFLET ---
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
@@ -24,7 +24,7 @@ let DefaultIcon = L.icon({
 });
 
 L.Marker.prototype.options.icon = DefaultIcon;
-// ----------------------------------------------------
+// ------------------------
 
 // Custom icons generator
 const createCustomIcon = (color: string) => {
@@ -36,10 +36,10 @@ const createCustomIcon = (color: string) => {
   });
 };
 
-const customerIcon = createCustomIcon("#3B82F6"); // Blue
-const oltIcon = createCustomIcon("#EF4444"); // Red
-const odcIcon = createCustomIcon("#F59E0B"); // Yellow
-const odpIcon = createCustomIcon("#10B981"); // Green
+const customerIcon = createCustomIcon("#3B82F6");
+const oltIcon = createCustomIcon("#EF4444");
+const odcIcon = createCustomIcon("#F59E0B");
+const odpIcon = createCustomIcon("#10B981");
 
 export interface MapLocation {
   id: string;
@@ -61,26 +61,23 @@ interface NetworkMapProps {
   coverageRadius?: number;
 }
 
-// Komponen helper untuk update view peta saat props center berubah
 const MapUpdater: React.FC<{ center: [number, number]; zoom: number }> = ({
   center,
   zoom,
 }) => {
   const map = useMap();
-
   useEffect(() => {
     if (center) {
       map.setView(center, zoom);
     }
   }, [center, zoom, map]);
-
   return null;
 };
 
 const NetworkMap: React.FC<NetworkMapProps> = ({
   locations,
   height = "600px",
-  center = [-5.3738973, 105.0782348], // Default Lampung (sesuaikan kebutuhan)
+  center = [-5.3738973, 105.0782348],
   zoom = 13,
   showCoverage = true,
   coverageRadius = 1000,
@@ -118,7 +115,6 @@ const NetworkMap: React.FC<NetworkMapProps> = ({
     }
   };
 
-  // Validasi koordinat valid sebelum render
   const validLocations = locations.filter(
     (loc) =>
       loc.lat !== null &&
@@ -128,92 +124,97 @@ const NetworkMap: React.FC<NetworkMapProps> = ({
   );
 
   return (
-    <div className="w-full border border-gray-300 rounded-lg overflow-hidden relative z-0">
-      <MapContainer
-        center={center}
-        zoom={zoom}
-        style={{ height: height, width: "100%", minHeight: "400px" }}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+    // PERUBAHAN UTAMA DI SINI:
+    // 1. Menggunakan flex flex-col agar children (Peta & Legend) tersusun vertikal
+    // 2. Height diterapkan di container utama ini
+    <div
+      className="w-full border border-gray-300 rounded-lg overflow-hidden relative z-0 flex flex-col"
+      style={{ height: height }}
+    >
+      {/* Container Peta: Diberi flex-1 agar memakan sisa ruang yang tersedia */}
+      <div className="flex-1 relative min-h-0">
+        <MapContainer
+          center={center}
+          zoom={zoom}
+          style={{ height: "100%", width: "100%" }} // Peta selalu 100% dari parent (flex-1)
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
 
-        {/* Komponen ini penting agar peta mau pindah posisi saat data berubah */}
-        <MapUpdater center={center} zoom={zoom} />
+          <MapUpdater center={center} zoom={zoom} />
 
-        {validLocations.map((location) => (
-          <React.Fragment key={location.id}>
-            <Marker
-              position={[Number(location.lat), Number(location.lng)]}
-              icon={getIcon(location.type)}
-            >
-              <Popup>
-                <div className="p-2 min-w-[200px]">
-                  <h3 className="font-semibold text-gray-900">
-                    {location.name}
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-2">
-                    {location.address ||
-                      `${Number(location.lat).toFixed(6)}, ${Number(
-                        location.lng
-                      ).toFixed(6)}`}
-                  </p>
-
-                  {location.status && (
-                    <p
-                      className={`text-sm ${getStatusColor(
-                        location.status
-                      )} font-medium capitalize`}
-                    >
-                      Status: {location.status}
+          {validLocations.map((location) => (
+            <React.Fragment key={location.id}>
+              <Marker
+                position={[Number(location.lat), Number(location.lng)]}
+                icon={getIcon(location.type)}
+              >
+                <Popup>
+                  <div className="p-2 min-w-[200px]">
+                    <h3 className="font-semibold text-gray-900">
+                      {location.name}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-2">
+                      {location.address ||
+                        `${Number(location.lat).toFixed(6)}, ${Number(
+                          location.lng
+                        ).toFixed(6)}`}
                     </p>
-                  )}
+                    {location.status && (
+                      <p
+                        className={`text-sm ${getStatusColor(
+                          location.status
+                        )} font-medium capitalize`}
+                      >
+                        Status: {location.status}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1 capitalize">
+                      Tipe: {location.type.toUpperCase()}
+                    </p>
+                    {location.details && (
+                      <div className="mt-2 pt-2 border-t border-gray-200">
+                        {Object.entries(location.details).map(([key, value]) =>
+                          value ? (
+                            <p key={key} className="text-xs text-gray-600">
+                              <span className="font-medium">{key}:</span>{" "}
+                              {value}
+                            </p>
+                          ) : null
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
 
-                  <p className="text-xs text-gray-500 mt-1 capitalize">
-                    Tipe: {location.type.toUpperCase()}
-                  </p>
+              {showCoverage &&
+                ["olt", "odc", "odp"].includes(location.type.toLowerCase()) && (
+                  <Circle
+                    center={[Number(location.lat), Number(location.lng)]}
+                    radius={coverageRadius}
+                    pathOptions={{
+                      color:
+                        location.type.toLowerCase() === "olt"
+                          ? "#EF4444"
+                          : location.type.toLowerCase() === "odc"
+                          ? "#F59E0B"
+                          : "#10B981",
+                      weight: 1,
+                      opacity: 0.3,
+                      fillOpacity: 0.1,
+                    }}
+                  />
+                )}
+            </React.Fragment>
+          ))}
+        </MapContainer>
+      </div>
 
-                  {location.details && (
-                    <div className="mt-2 pt-2 border-t border-gray-200">
-                      {Object.entries(location.details).map(([key, value]) =>
-                        value ? (
-                          <p key={key} className="text-xs text-gray-600">
-                            <span className="font-medium">{key}:</span> {value}
-                          </p>
-                        ) : null
-                      )}
-                    </div>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-
-            {/* Show coverage area */}
-            {showCoverage &&
-              ["olt", "odc", "odp"].includes(location.type.toLowerCase()) && (
-                <Circle
-                  center={[Number(location.lat), Number(location.lng)]}
-                  radius={coverageRadius}
-                  pathOptions={{
-                    color:
-                      location.type.toLowerCase() === "olt"
-                        ? "#EF4444"
-                        : location.type.toLowerCase() === "odc"
-                        ? "#F59E0B"
-                        : "#10B981",
-                    weight: 1,
-                    opacity: 0.3,
-                    fillOpacity: 0.1,
-                  }}
-                />
-              )}
-          </React.Fragment>
-        ))}
-      </MapContainer>
-
-      {/* Legend */}
-      <div className="p-4 bg-gray-50 border-t border-gray-300">
+      {/* Legend: Diberi shrink-0 agar ukurannya tidak mengecil, tetap di bawah */}
+      <div className="p-4 bg-gray-50 border-t border-gray-300 shrink-0">
         <div className="flex flex-wrap gap-4 text-sm">
           <div className="flex items-center">
             <div className="w-4 h-4 rounded-full bg-blue-500 mr-2 border-2 border-white shadow-sm"></div>

@@ -356,25 +356,14 @@ const NetworkMapPage: React.FC = () => {
           </div>
 
           {/* Container Peta dengan CSS Manual */}
-          <div
-            style={{
-              height: 'calc(100vh - 200px)',
-              width: "100%",
-              position: "relative",
-              zIndex: 0,
-            }}
-            className="border border-gray-200 rounded-lg overflow-hidden"
-          >
-            <NetworkMap
-              locations={filteredLocations as any}
-              height="100%"
-              // PENTING: Gunakan mapCenter yang sudah dihitung dinamis
-              center={mapCenter}
-              zoom={13} // Zoom agak diperbesar karena kita fokus ke area data
-              showCoverage={showCoverage}
-              coverageRadius={coverageRadius}
-            />
-          </div>
+          <NetworkMap
+            locations={filteredLocations as any}
+            height="600px" // Peta + Legend total tingginya akan 600px
+            center={mapCenter}
+            zoom={13}
+            showCoverage={showCoverage}
+            coverageRadius={coverageRadius}
+          />
         </div>
       </div>
     </Layout>
