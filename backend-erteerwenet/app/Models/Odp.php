@@ -34,4 +34,10 @@ class Odp extends Model
     {
         return $this->odc ? $this->odc->name : 'Unknown ODC';
     }
+
+    // Relasi: ODP punya banyak Customer
+    public function customers()
+    {
+        return $this->hasMany(Customer::class);
+    }
 }

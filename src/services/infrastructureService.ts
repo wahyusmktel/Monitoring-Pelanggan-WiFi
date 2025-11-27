@@ -212,4 +212,14 @@ export const infrastructureService = {
       throw error;
     }
   },
+  // Port Monitoring Service
+  getPortMonitoring: async (): Promise<any[]> => {
+    try {
+      const response = await apiClient.get('/infrastructure/monitoring/ports');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching port monitoring data:', error);
+      throw error;
+    }
+  },
 };

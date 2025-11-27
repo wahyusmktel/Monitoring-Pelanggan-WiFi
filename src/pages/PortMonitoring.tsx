@@ -1,195 +1,91 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import { Activity, Box, Users, Network, Search, Filter, TrendingUp, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { Activity, Box, Users, Network, Search, Filter, TrendingUp, AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { infrastructureService } from '@/services/infrastructureService'; // Import service
+import { toast } from 'sonner';
 
-interface ODP {
-  id: string;
-  name: string;
-  location: string;
-  capacity: number;
-  usedPorts: number;
-  odcId: string;
-  odcName: string;
-  odcPort: number;
-  status: 'active' | 'inactive' | 'maintenance';
-  type: 'distribution' | 'terminal' | 'splitter';
-  customerCount: number;
-}
-
-interface Customer {
-  id: string;
-  name: string;
-  odpId: string;
-  odpPort: number;
-  status: 'active' | 'inactive' | 'pending' | 'suspended';
-}
-
+// Interface disesuaikan dengan response backend
 interface PortStatus {
   portNumber: number;
   status: 'available' | 'used' | 'maintenance';
   customerName?: string;
-  customerId?: string;
+  customerId?: number;
 }
 
-interface ODPWithPortDetails extends ODP {
+interface ODPWithPortDetails {
+  id: number;
+  name: string;
+  location: string;
+  capacity: number;
+  usedPorts: number;
+  odcId: number;
+  odcName: string;
+  odcPort: number;
+  status: 'active' | 'inactive' | 'maintenance';
+  type: string;
+  customerCount: number;
   ports: PortStatus[];
   utilizationRate: number;
   availablePorts: number;
 }
 
 const PortMonitoring: React.FC = () => {
-  const [odps, setOdps] = useState<ODP[]>([
-    {
-      id: '1',
-      name: 'ODP-Central-01A',
-      location: 'Jl. Gatot Subroto Kav. 1A, Jakarta',
-      capacity: 8,
-      usedPorts: 6,
-      odcId: '1',
-      odcName: 'ODC-Central-01',
-      odcPort: 1,
-      status: 'active',
-      type: 'distribution',
-      customerCount: 6
-    },
-    {
-      id: '2',
-      name: 'ODP-North-01B',
-      location: 'Jl. HR Rasuna Said Kav. 5B, Jakarta',
-      capacity: 4,
-      usedPorts: 3,
-      odcId: '2',
-      odcName: 'ODC-North-01',
-      odcPort: 2,
-      status: 'active',
-      type: 'terminal',
-      customerCount: 3
-    },
-    {
-      id: '3',
-      name: 'ODP-South-02A',
-      location: 'Jl. Sudirman Kav. 10, Jakarta',
-      capacity: 16,
-      usedPorts: 12,
-      odcId: '3',
-      odcName: 'ODC-South-02',
-      odcPort: 5,
-      status: 'active',
-      type: 'distribution',
-      customerCount: 12
-    },
-    {
-      id: '4',
-      name: 'ODP-West-03B',
-      location: 'Jl. Thamrin No. 15, Jakarta',
-      capacity: 8,
-      usedPorts: 2,
-      odcId: '4',
-      odcName: 'ODC-West-03',
-      odcPort: 8,
-      status: 'maintenance',
-      type: 'terminal',
-      customerCount: 2
-    }
-  ]);
-
-  const [customers] = useState<Customer[]>([
-    { id: '1', name: 'Budi Santoso', odpId: '1', odpPort: 1, status: 'active' },
-    { id: '2', name: 'Siti Nurhaliza', odpId: '1', odpPort: 2, status: 'active' },
-    { id: '3', name: 'Ahmad Rahman', odpId: '1', odpPort: 3, status: 'active' },
-    { id: '4', name: 'Maria Garcia', odpId: '1', odpPort: 4, status: 'inactive' },
-    { id: '5', name: 'John Smith', odpId: '1', odpPort: 5, status: 'active' },
-    { id: '6', name: 'Lisa Wong', odpId: '1', odpPort: 6, status: 'active' },
-    { id: '7', name: 'David Chen', odpId: '2', odpPort: 1, status: 'active' },
-    { id: '8', name: 'Emma Johnson', odpId: '2', odpPort: 2, status: 'active' },
-    { id: '9', name: 'Michael Brown', odpId: '2', odpPort: 3, status: 'pending' },
-    { id: '10', name: 'Sarah Davis', odpId: '3', odpPort: 1, status: 'active' },
-    { id: '11', name: 'Robert Wilson', odpId: '3', odpPort: 2, status: 'active' },
-    { id: '12', name: 'Jennifer Lee', odpId: '3', odpPort: 3, status: 'active' },
-    { id: '13', name: 'William Taylor', odpId: '3', odpPort: 4, status: 'active' },
-    { id: '14', name: 'Jessica Martinez', odpId: '3', odpPort: 5, status: 'active' },
-    { id: '15', name: 'Daniel Anderson', odpId: '3', odpPort: 6, status: 'active' },
-    { id: '16', name: 'Amanda Thomas', odpId: '3', odpPort: 7, status: 'active' },
-    { id: '17', name: 'James Jackson', odpId: '3', odpPort: 8, status: 'active' },
-    { id: '18', name: 'Patricia White', odpId: '3', odpPort: 9, status: 'active' },
-    { id: '19', name: 'Linda Harris', odpId: '3', odpPort: 10, status: 'active' },
-    { id: '20', name: 'Charles Clark', odpId: '3', odpPort: 11, status: 'active' },
-    { id: '21', name: 'Barbara Lewis', odpId: '3', odpPort: 12, status: 'active' },
-    { id: '22', name: 'Kevin Walker', odpId: '4', odpPort: 1, status: 'active' },
-    { id: '23', name: 'Nancy Hall', odpId: '4', odpPort: 2, status: 'inactive' }
-  ]);
-
-  const [selectedOdp, setSelectedOdp] = useState<string>('all');
+  const [odpsWithPorts, setOdpsWithPorts] = useState<ODPWithPortDetails[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [odpsWithPorts, setOdpsWithPorts] = useState<ODPWithPortDetails[]>([]);
+  const [selectedOdp, setSelectedOdp] = useState<string>('all');
 
-  // Generate port details for each ODP
+  // Fetch Data Real-time dari API
   useEffect(() => {
-    const enhancedOdps = odps.map(odp => {
-      const ports: PortStatus[] = [];
-      for (let i = 1; i <= odp.capacity; i++) {
-        const customer = customers.find(c => c.odpId === odp.id && c.odpPort === i);
-        if (odp.status === 'maintenance') {
-          ports.push({
-            portNumber: i,
-            status: 'maintenance',
-            customerName: customer?.name,
-            customerId: customer?.id
-          });
-        } else if (customer) {
-          ports.push({
-            portNumber: i,
-            status: customer.status === 'active' ? 'used' : 'maintenance',
-            customerName: customer.name,
-            customerId: customer.id
-          });
-        } else {
-          ports.push({
-            portNumber: i,
-            status: 'available',
-            customerName: undefined,
-            customerId: undefined
-          });
-        }
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const data = await infrastructureService.getPortMonitoring();
+        setOdpsWithPorts(data);
+      } catch (error) {
+        console.error("Failed to fetch monitoring data", error);
+        toast.error("Gagal memuat data monitoring");
+      } finally {
+        setLoading(false);
       }
-      
-      return {
-        ...odp,
-        ports,
-        utilizationRate: (odp.usedPorts / odp.capacity) * 100,
-        availablePorts: odp.capacity - odp.usedPorts
-      };
-    });
-    
-    setOdpsWithPorts(enhancedOdps);
-  }, [odps, customers]);
+    };
 
+    fetchData();
+    
+    // Optional: Auto refresh setiap 30 detik
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Filter Logic
   const filteredOdps = odpsWithPorts.filter(odp => {
     const matchesSearch = odp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         odp.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         odp.odcName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesOdp = selectedOdp === 'all' || odp.id === selectedOdp;
+                          odp.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          odp.odcName.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesOdp = selectedOdp === 'all' || odp.id.toString() === selectedOdp;
+    
     const matchesStatus = filterStatus === 'all' || 
-                         (filterStatus === 'high' && odp.utilizationRate >= 80) ||
-                         (filterStatus === 'medium' && odp.utilizationRate >= 50 && odp.utilizationRate < 80) ||
-                         (filterStatus === 'low' && odp.utilizationRate < 50);
+                          (filterStatus === 'high' && odp.utilizationRate >= 80) ||
+                          (filterStatus === 'medium' && odp.utilizationRate >= 50 && odp.utilizationRate < 80) ||
+                          (filterStatus === 'low' && odp.utilizationRate < 50);
     
     return matchesSearch && matchesOdp && matchesStatus;
   });
 
   // Calculate statistics
-  const totalPorts = odps.reduce((sum, odp) => sum + odp.capacity, 0);
-  const totalUsedPorts = odps.reduce((sum, odp) => sum + odp.usedPorts, 0);
+  const totalPorts = odpsWithPorts.reduce((sum, odp) => sum + odp.capacity, 0);
+  const totalUsedPorts = odpsWithPorts.reduce((sum, odp) => sum + odp.usedPorts, 0);
   const totalAvailablePorts = totalPorts - totalUsedPorts;
-  const overallUtilization = (totalUsedPorts / totalPorts) * 100;
+  const overallUtilization = totalPorts > 0 ? (totalUsedPorts / totalPorts) * 100 : 0;
 
   // Chart data
   const utilizationData = [
     { name: 'Tersedia', value: totalAvailablePorts, color: '#10B981' },
     { name: 'Terpakai', value: totalUsedPorts, color: '#3B82F6' },
-    { name: 'Maintenance', value: odps.filter(o => o.status === 'maintenance').reduce((sum, o) => sum + o.capacity, 0), color: '#F59E0B' }
+    { name: 'Maintenance', value: odpsWithPorts.filter(o => o.status === 'maintenance').reduce((sum, o) => sum + o.capacity, 0), color: '#F59E0B' }
   ];
 
   const odpUtilizationData = odpsWithPorts.map(odp => ({
@@ -216,6 +112,19 @@ const PortMonitoring: React.FC = () => {
       default: return 'Tidak Diketahui';
     }
   };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex justify-center items-center h-64">
+            <Loader2 className="animate-spin h-12 w-12 text-blue-600" />
+            <span className="ml-3 text-gray-600">Memuat data monitoring...</span>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -354,8 +263,8 @@ const PortMonitoring: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">Semua ODP</option>
-                {odps.map((odp) => (
-                  <option key={odp.id} value={odp.id}>
+                {odpsWithPorts.map((odp) => (
+                  <option key={odp.id} value={odp.id.toString()}>
                     {odp.name}
                   </option>
                 ))}
@@ -399,7 +308,7 @@ const PortMonitoring: React.FC = () => {
                   <p className="text-gray-600">{odp.location}</p>
                   <div className="flex items-center mt-2 text-sm text-gray-500">
                     <Network className="w-4 h-4 mr-1" />
-                    <span>ODC: {odp.odcName} (Port {odp.odcPort})</span>
+                    <span>ODC: {odp.odcName}</span>
                   </div>
                 </div>
                 <div className="text-right">
@@ -438,7 +347,7 @@ const PortMonitoring: React.FC = () => {
                       </div>
                       
                       {/* Tooltip */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 whitespace-nowrap">
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 whitespace-nowrap pointer-events-none">
                         {port.customerName || getPortStatusText(port.status)}
                       </div>
                     </div>
