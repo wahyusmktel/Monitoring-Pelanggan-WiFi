@@ -95,6 +95,39 @@ export interface Payment {
   subscription?: { package?: { name: string } }; // Nested relation buat nama paket
 }
 
+// Tambahkan Interface Response Monitoring
+export interface PaymentMonitoringData {
+  summary: {
+    totalRevenue: number;
+    totalPayments: number;
+    paidCount: number;
+    pendingCount: number;
+    overdueCount: number;
+    averagePayment: number;
+  };
+  monthly: Array<{
+    month: number;
+    year: number;
+    totalRevenue: number;
+    totalPayments: number;
+    paidCount: number;
+    pendingCount: number;
+    overdueCount: number;
+  }>;
+  methods: Array<{
+    payment_method: string; // Perhatikan snake_case dari query Laravel
+    count: number;
+    value: number;
+  }>;
+  customers: Array<{
+    customerName: string;
+    customerId: string;
+    totalPayments: number;
+    totalAmount: number;
+    lastPayment: string;
+  }>;
+}
+
 export const servicesService = {
   // Package Services
   getPackages: async (): Promise<Package[]> => {
@@ -115,6 +148,12 @@ export const servicesService = {
       console.error(`Error fetching package ${id}:`, error);
       throw error;
     }
+  },
+
+  // Monitoring
+  getPaymentMonitoring: async (): Promise<PaymentMonitoringData> => {
+    const response = await apiClient.get("/services/payments/monitoring");
+    return response.data;
   },
 
   createPackage: async (pkg: PackageCreate): Promise<Package> => {

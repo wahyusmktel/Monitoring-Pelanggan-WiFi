@@ -9,6 +9,7 @@ use App\Models\Subscription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
@@ -103,6 +104,72 @@ class PaymentController extends Controller
         return response()->json([
             'message' => 'Pembayaran berhasil & Token dibuat',
             'data' => $payment
+        ]);
+    }
+
+    // METHOD BARU: Monitoring Stats
+    public function monitoring(Request $request)
+    {
+        // 1. Statistik Ringkasan (Card Atas)
+        $totalRevenue = Payment::where('status', 'paid')->sum('amount');
+        $totalPayments = Payment::count();
+        $paidCount = Payment::where('status', 'paid')->count();
+        $pendingCount = Payment::where('status', 'pending')->count();
+        $overdueCount = Payment::where('status', 'overdue')->count();
+
+        // Rata-rata pembayaran
+        $avgPayment = $paidCount > 0 ? $totalRevenue / $paidCount : 0;
+
+        // 2. Data Grafik Bulanan (Last 12 Months)
+        $monthlyStats = Payment::select(
+            DB::raw('billing_year as year'),
+            DB::raw('billing_month as month'),
+            DB::raw('SUM(amount) as totalRevenue'),
+            DB::raw('COUNT(*) as totalPayments'),
+            DB::raw('SUM(CASE WHEN status = "paid" THEN 1 ELSE 0 END) as paidCount'),
+            DB::raw('SUM(CASE WHEN status = "pending" THEN 1 ELSE 0 END) as pendingCount'),
+            DB::raw('SUM(CASE WHEN status = "overdue" THEN 1 ELSE 0 END) as overdueCount')
+        )
+            ->groupBy('billing_year', 'billing_month')
+            ->orderBy('billing_year', 'desc')
+            ->orderBy('billing_month', 'desc')
+            ->limit(12)
+            ->get();
+
+        // 3. Data Distribusi Metode Pembayaran
+        $methodStats = Payment::where('status', 'paid')
+            ->select('payment_method', DB::raw('count(*) as count'), DB::raw('sum(amount) as value'))
+            ->groupBy('payment_method')
+            ->get();
+
+        // 4. Top Customer (Berdasarkan total bayar)
+        $customerStats = Payment::where('payments.status', 'paid')
+            ->join('customers', 'payments.customer_id', '=', 'customers.id')
+            ->select(
+                'customers.id',
+                'customers.name as customerName',
+                'customers.customer_number as customerId',
+                DB::raw('count(payments.id) as totalPayments'),
+                DB::raw('sum(payments.amount) as totalAmount'),
+                DB::raw('max(payments.payment_date) as lastPayment')
+            )
+            ->groupBy('customers.id', 'customers.name', 'customers.customer_number')
+            ->orderByDesc('totalAmount')
+            ->limit(10)
+            ->get();
+
+        return response()->json([
+            'summary' => [
+                'totalRevenue' => $totalRevenue,
+                'totalPayments' => $totalPayments,
+                'paidCount' => $paidCount,
+                'pendingCount' => $pendingCount,
+                'overdueCount' => $overdueCount,
+                'averagePayment' => round($avgPayment),
+            ],
+            'monthly' => $monthlyStats,
+            'methods' => $methodStats,
+            'customers' => $customerStats
         ]);
     }
 }
