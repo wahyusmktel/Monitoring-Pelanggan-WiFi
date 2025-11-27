@@ -1,4 +1,4 @@
-import apiClient from './api';
+import apiClient from "./api";
 
 export interface OLT {
   id: number;
@@ -62,14 +62,25 @@ export interface InfrastructureFilters {
   limit?: number;
 }
 
+export interface MapLocation {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  address?: string;
+  type: "customer" | "olt" | "odc" | "odp";
+  status?: "active" | "inactive" | "maintenance" | "pending" | "suspended";
+  details?: Record<string, any>;
+}
+
 export const infrastructureService = {
   // OLT Services
   getOLTs: async (filters?: InfrastructureFilters): Promise<OLT[]> => {
     try {
-      const response = await apiClient.get('/olts', { params: filters });
+      const response = await apiClient.get("/olts", { params: filters });
       return response.data;
     } catch (error) {
-      console.error('Error fetching OLTs:', error);
+      console.error("Error fetching OLTs:", error);
       throw error;
     }
   },
@@ -84,17 +95,22 @@ export const infrastructureService = {
     }
   },
 
-  createOLT: async (olt: Omit<OLT, 'id' | 'created_at' | 'updated_at'>): Promise<OLT> => {
+  createOLT: async (
+    olt: Omit<OLT, "id" | "created_at" | "updated_at">
+  ): Promise<OLT> => {
     try {
-      const response = await apiClient.post('/olts', olt);
+      const response = await apiClient.post("/olts", olt);
       return response.data;
     } catch (error) {
-      console.error('Error creating OLT:', error);
+      console.error("Error creating OLT:", error);
       throw error;
     }
   },
 
-  updateOLT: async (id: number, olt: Partial<Omit<OLT, 'id' | 'created_at' | 'updated_at'>>): Promise<OLT> => {
+  updateOLT: async (
+    id: number,
+    olt: Partial<Omit<OLT, "id" | "created_at" | "updated_at">>
+  ): Promise<OLT> => {
     try {
       const response = await apiClient.put(`/olts/${id}`, olt);
       return response.data;
@@ -114,12 +130,14 @@ export const infrastructureService = {
   },
 
   // ODC Services
-  getODCs: async (filters?: InfrastructureFilters & { olt_id?: number }): Promise<ODC[]> => {
+  getODCs: async (
+    filters?: InfrastructureFilters & { olt_id?: number }
+  ): Promise<ODC[]> => {
     try {
-      const response = await apiClient.get('/odcs', { params: filters });
+      const response = await apiClient.get("/odcs", { params: filters });
       return response.data;
     } catch (error) {
-      console.error('Error fetching ODCs:', error);
+      console.error("Error fetching ODCs:", error);
       throw error;
     }
   },
@@ -134,17 +152,22 @@ export const infrastructureService = {
     }
   },
 
-  createODC: async (odc: Omit<ODC, 'id' | 'created_at' | 'updated_at' | 'olt'>): Promise<ODC> => {
+  createODC: async (
+    odc: Omit<ODC, "id" | "created_at" | "updated_at" | "olt">
+  ): Promise<ODC> => {
     try {
-      const response = await apiClient.post('/odcs', odc);
+      const response = await apiClient.post("/odcs", odc);
       return response.data;
     } catch (error) {
-      console.error('Error creating ODC:', error);
+      console.error("Error creating ODC:", error);
       throw error;
     }
   },
 
-  updateODC: async (id: number, odc: Partial<Omit<ODC, 'id' | 'created_at' | 'updated_at' | 'olt'>>): Promise<ODC> => {
+  updateODC: async (
+    id: number,
+    odc: Partial<Omit<ODC, "id" | "created_at" | "updated_at" | "olt">>
+  ): Promise<ODC> => {
     try {
       const response = await apiClient.put(`/odcs/${id}`, odc);
       return response.data;
@@ -164,12 +187,14 @@ export const infrastructureService = {
   },
 
   // ODP Services
-  getODPs: async (filters?: InfrastructureFilters & { odc_id?: number }): Promise<ODP[]> => {
+  getODPs: async (
+    filters?: InfrastructureFilters & { odc_id?: number }
+  ): Promise<ODP[]> => {
     try {
-      const response = await apiClient.get('/odps', { params: filters });
+      const response = await apiClient.get("/odps", { params: filters });
       return response.data;
     } catch (error) {
-      console.error('Error fetching ODPs:', error);
+      console.error("Error fetching ODPs:", error);
       throw error;
     }
   },
@@ -184,17 +209,22 @@ export const infrastructureService = {
     }
   },
 
-  createODP: async (odp: Omit<ODP, 'id' | 'created_at' | 'updated_at' | 'odc'>): Promise<ODP> => {
+  createODP: async (
+    odp: Omit<ODP, "id" | "created_at" | "updated_at" | "odc">
+  ): Promise<ODP> => {
     try {
-      const response = await apiClient.post('/odps', odp);
+      const response = await apiClient.post("/odps", odp);
       return response.data;
     } catch (error) {
-      console.error('Error creating ODP:', error);
+      console.error("Error creating ODP:", error);
       throw error;
     }
   },
 
-  updateODP: async (id: number, odp: Partial<Omit<ODP, 'id' | 'created_at' | 'updated_at' | 'odc'>>): Promise<ODP> => {
+  updateODP: async (
+    id: number,
+    odp: Partial<Omit<ODP, "id" | "created_at" | "updated_at" | "odc">>
+  ): Promise<ODP> => {
     try {
       const response = await apiClient.put(`/odps/${id}`, odp);
       return response.data;
@@ -215,10 +245,20 @@ export const infrastructureService = {
   // Port Monitoring Service
   getPortMonitoring: async (): Promise<any[]> => {
     try {
-      const response = await apiClient.get('/infrastructure/monitoring/ports');
+      const response = await apiClient.get("/infrastructure/monitoring/ports");
       return response.data;
     } catch (error) {
-      console.error('Error fetching port monitoring data:', error);
+      console.error("Error fetching port monitoring data:", error);
+      throw error;
+    }
+  },
+  // Network Map Service
+  getNetworkMapLocations: async (): Promise<MapLocation[]> => {
+    try {
+      const response = await apiClient.get("/infrastructure/map/locations");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching map locations:", error);
       throw error;
     }
   },

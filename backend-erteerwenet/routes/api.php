@@ -7,6 +7,7 @@ use App\Http\Controllers\Infrastructure\OdpController;
 use App\Http\Controllers\Services\PackageController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\Infrastructure\PortMonitoringController;
+use App\Http\Controllers\Infrastructure\NetworkMapController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -53,6 +54,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/odcs/{odcId}/odps', [OdpController::class, 'getByOdc']); // Get ODP by ODC ID
         // Route Khusus Monitoring
         Route::get('/monitoring/ports', [PortMonitoringController::class, 'index']);
+        // Route Network Map
+        Route::get('/map/locations', [NetworkMapController::class, 'index']);
     });
 
     // Services Routes
