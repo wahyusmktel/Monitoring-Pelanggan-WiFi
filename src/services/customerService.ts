@@ -2,6 +2,7 @@ import api from './api';
 
 export interface Customer {
   id?: number;
+  customer_number?: string | null;
   name: string;
   email: string;
   phone: string;

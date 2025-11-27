@@ -86,6 +86,29 @@ class CustomerController extends Controller
             'is_active' => 'boolean',
         ]);
 
+        // Jika status diubah jadi 'active' DAN belum punya customer_number
+        if (
+            isset($validated['status']) &&
+            $validated['status'] === 'active' &&
+            is_null($customer->customer_number)
+        ) {
+            // Cari nomor terakhir yang depannya 79
+            $latestCustomer = Customer::where('customer_number', 'like', '79%')
+                ->orderBy('customer_number', 'desc')
+                ->first();
+
+            if ($latestCustomer) {
+                // Jika ada, tambah 1 (Contoh: 790001 -> 790002)
+                $nextId = intval($latestCustomer->customer_number) + 1;
+            } else {
+                // Jika belum ada sama sekali, mulai dari 790001
+                $nextId = 790001;
+            }
+
+            // Masukkan ke array validated untuk di-update
+            $validated['customer_number'] = (string) $nextId;
+        }
+
         $customer->update($validated);
 
         return response()->json($customer);

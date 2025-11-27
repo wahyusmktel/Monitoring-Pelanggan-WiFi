@@ -458,6 +458,11 @@ const Customers: React.FC = () => {
                     <h3 className="text-lg font-semibold text-gray-900">
                       {customer.name}
                     </h3>
+                    {customer.customer_number && (
+                      <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded border border-blue-200 mb-1 font-mono">
+                        ID: {customer.customer_number}
+                      </span>
+                    )}
                     <p className="text-sm text-gray-500">{customer.email}</p>
                   </div>
                 </div>

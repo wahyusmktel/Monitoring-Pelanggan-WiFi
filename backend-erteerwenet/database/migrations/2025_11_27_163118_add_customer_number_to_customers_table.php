@@ -12,17 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('customers', function (Blueprint $table) {
-            //
+            // Menambahkan kolom setelah id, nullable karena pending belum punya ID
+            $table->string('customer_number', 6)->nullable()->unique()->after('id');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('customers', function (Blueprint $table) {
-            //
+            $table->dropColumn('customer_number');
         });
     }
 };
