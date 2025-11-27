@@ -8,6 +8,7 @@ use App\Http\Controllers\Services\PackageController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\Infrastructure\PortMonitoringController;
 use App\Http\Controllers\Infrastructure\NetworkMapController;
+use App\Http\Controllers\Services\PaymentController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -66,6 +67,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/packages/{id}', [PackageController::class, 'show']);
         Route::put('/packages/{id}', [PackageController::class, 'update']);
         Route::delete('/packages/{id}', [PackageController::class, 'destroy']);
+
+        // Payments
+        Route::get('/payments', [PaymentController::class, 'index']);
+        Route::post('/payments/generate', [PaymentController::class, 'generateBilling']); // Generate Bulanan
+        Route::post('/payments/{id}/pay', [PaymentController::class, 'pay']); // Bayar per ID
     });
 
     // Route khusus ODP Available (sesuai frontend service path: /odps/available)
