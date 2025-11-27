@@ -5,6 +5,7 @@ use App\Http\Controllers\Infrastructure\OltController;
 use App\Http\Controllers\Infrastructure\OdcController;
 use App\Http\Controllers\Infrastructure\OdpController;
 use App\Http\Controllers\Services\PackageController;
+use App\Http\Controllers\CustomerController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -14,7 +15,7 @@ Route::post('/login', [AuthController::class, 'login']);
 // Group Route yang butuh Token (Protected)
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
-    
+
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
@@ -26,7 +27,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/olts/{id}', [OltController::class, 'show']);
         Route::put('/olts/{id}', [OltController::class, 'update']);
         Route::delete('/olts/{id}', [OltController::class, 'destroy']);
-        
+
         // Extra endpoint sesuai request di service frontend
         Route::get('/olts/{id}/available-ports', [OltController::class, 'getAvailablePorts']);
 
@@ -63,5 +64,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Route khusus ODP Available (sesuai frontend service path: /odps/available)
     Route::get('/odps/available', [OdpController::class, 'getAvailable']);
-    
+
+    // Customer Routes
+    Route::get('/customers', [CustomerController::class, 'index']);
+    Route::post('/customers', [CustomerController::class, 'store']);
+    Route::get('/customers/stats', [CustomerController::class, 'stats']); // Pastikan stats sebelum {id}
+    Route::get('/customers/{id}', [CustomerController::class, 'show']);
+    Route::put('/customers/{id}', [CustomerController::class, 'update']);
+    Route::delete('/customers/{id}', [CustomerController::class, 'destroy']);
 });

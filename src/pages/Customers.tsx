@@ -1,31 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import { Plus, Edit, Trash2, Search, User, MapPin, Network, Package, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import MapPicker from '@/components/MapPicker';
-import { customerService, Customer, CustomerCreate, CustomerUpdate } from '@/services/customerService';
-import { infrastructureService } from '@/services/infrastructureService';
-import { servicesService } from '@/services/servicesService';
-
-// Interface untuk ODP (dari API)
-interface ODP {
-  id: number;
-  name: string;
-  location: string;
-  total_ports: number;
-  used_ports: number;
-  status: string;
-  latitude?: number | null;
-  longitude?: number | null;
-}
-
-// Interface untuk Paket Layanan (dari API)
-interface Package {
-  id: number;
-  name: string;
-  speed: string;
-  price: number;
-  description?: string | null;
-}
+import { Plus, Edit, Trash2, Search, User, MapPin, Network, Package as PackageIcon, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
+import MapPicker from '@/components/MapPicker'; 
+import { customerService, Customer, CustomerCreate } from '@/services/customerService';
+import { odpService, ODP } from '@/services/odpService';
+import { servicesService, Package } from '@/services/servicesService';
+import { toast } from 'sonner';
 
 const Customers: React.FC = () => {
   // State untuk data dari API
@@ -35,7 +15,6 @@ const Customers: React.FC = () => {
   
   // State untuk loading dan error
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   
   // State untuk form dan UI
@@ -53,17 +32,13 @@ const Customers: React.FC = () => {
     address: '',
     latitude: null,
     longitude: null,
-    odp_id: null,
-    package_id: null,
+    odp_id: 0,
+    package_id: 0,
     status: 'pending',
     installation_date: new Date().toISOString().split('T')[0],
     notes: '',
     is_active: true,
   });
-
-  // State untuk dropdown yang bergantung
-  const [availablePorts, setAvailablePorts] = useState<number[]>([]);
-  const [selectedOdpDetails, setSelectedOdpDetails] = useState<ODP | null>(null);
 
   // Fetch data dari API
   useEffect(() => {
@@ -73,67 +48,84 @@ const Customers: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      setError(null);
       
       // Fetch semua data secara parallel
-      const [customersData, odpsData, packagesData] = await Promise.all([
+      const [customersData, odpsResponse, packagesData] = await Promise.all([
         customerService.getCustomers(),
-        infrastructureService.getODPs(),
+        odpService.getAll(1, 100), // Ambil 100 ODP pertama untuk dropdown
         servicesService.getPackages(),
       ]);
       
       setCustomers(customersData);
-      setOdps(odpsData);
-      setPackages(packagesData);
+      setOdps(odpsResponse.data); 
+      setPackages(packagesData as unknown as Package[]); 
     } catch (err) {
-      setError('Gagal memuat data dari server. Silakan coba lagi.');
+      toast.error('Gagal memuat data dari server');
       console.error('Error fetching data:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  // Handler saat lokasi dipilih dari peta
+  const handleLocationSelect = (lat: number, lng: number) => {
+    setFormData(prev => ({
+      ...prev,
+      latitude: lat,
+      longitude: lng
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validasi form
+    // Validasi form manual
     if (!formData.name || !formData.email || !formData.phone || !formData.address) {
-      alert('Semua field wajib diisi!');
+      toast.error('Semua field wajib diisi!');
       return;
     }
 
-    // Validasi ODP selection
     if (!formData.odp_id) {
-      alert('Silakan pilih ODP terlebih dahulu');
+      toast.error('Silakan pilih ODP terlebih dahulu');
       return;
     }
 
-    // Validasi paket
     if (!formData.package_id) {
-      alert('Silakan pilih paket layanan terlebih dahulu');
+      toast.error('Silakan pilih paket layanan terlebih dahulu');
       return;
     }
 
     try {
       setSubmitting(true);
       
-      if (editingCustomer) {
-        // Update existing customer
-        const updatedCustomer = await customerService.updateCustomer(editingCustomer.id!, formData);
-        setCustomers(prev => prev.map(customer => 
-          customer.id === editingCustomer.id ? updatedCustomer : customer
-        ));
+      const payload = {
+        ...formData,
+        odp_id: Number(formData.odp_id),
+        package_id: Number(formData.package_id),
+        latitude: formData.latitude ? Number(formData.latitude) : null,
+        longitude: formData.longitude ? Number(formData.longitude) : null,
+      } as CustomerCreate;
+
+      if (editingCustomer && editingCustomer.id) {
+        await customerService.updateCustomer(editingCustomer.id, payload);
+        toast.success('Data pelanggan berhasil diperbarui');
       } else {
-        // Create new customer
-        const newCustomer = await customerService.createCustomer(formData as CustomerCreate);
-        setCustomers(prev => [...prev, newCustomer]);
+        await customerService.createCustomer(payload);
+        toast.success('Pelanggan baru berhasil ditambahkan');
       }
       
+      fetchData(); 
       resetForm();
-      alert(editingCustomer ? 'Pelanggan berhasil diupdate!' : 'Pelanggan baru berhasil ditambahkan!');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting customer:', err);
-      alert('Gagal menyimpan data pelanggan. Silakan coba lagi.');
+      if (err.response?.data?.errors) {
+         const errors = err.response.data.errors;
+         Object.keys(errors).forEach(key => {
+            toast.error(`${key}: ${errors[key][0]}`);
+         });
+      } else {
+         toast.error('Gagal menyimpan data pelanggan');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -147,15 +139,13 @@ const Customers: React.FC = () => {
       address: '',
       latitude: null,
       longitude: null,
-      odp_id: null,
-      package_id: null,
+      odp_id: 0,
+      package_id: 0,
       status: 'pending',
       installation_date: new Date().toISOString().split('T')[0],
       notes: '',
       is_active: true,
     });
-    setAvailablePorts([]);
-    setSelectedOdpDetails(null);
     setShowForm(false);
     setEditingCustomer(null);
   };
@@ -169,23 +159,13 @@ const Customers: React.FC = () => {
       address: customer.address,
       latitude: customer.latitude,
       longitude: customer.longitude,
-      odp_id: customer.odp_id,
-      package_id: customer.package_id,
+      odp_id: customer.odp_id || 0,
+      package_id: customer.package_id || 0,
       status: customer.status,
       installation_date: customer.installation_date,
       notes: customer.notes,
       is_active: customer.is_active,
     });
-    
-    // Set available ports dan detail ODP saat editing
-    if (customer.odp_id) {
-      const odp = odps.find(o => o.id === customer.odp_id);
-      if (odp) {
-        const ports = Array.from({ length: odp.total_ports }, (_, i) => i + 1);
-        setAvailablePorts(ports);
-        setSelectedOdpDetails(odp);
-      }
-    }
     
     setShowForm(true);
   };
@@ -195,10 +175,10 @@ const Customers: React.FC = () => {
       try {
         await customerService.deleteCustomer(id);
         setCustomers(prev => prev.filter(customer => customer.id !== id));
-        alert('Pelanggan berhasil dihapus!');
+        toast.success('Pelanggan berhasil dihapus');
       } catch (err) {
         console.error('Error deleting customer:', err);
-        alert('Gagal menghapus pelanggan. Silakan coba lagi.');
+        toast.error('Gagal menghapus pelanggan');
       }
     }
   };
@@ -207,27 +187,16 @@ const Customers: React.FC = () => {
     if (odpId) {
       const selectedOdp = odps.find(odp => odp.id === odpId);
       if (selectedOdp) {
-        // Generate available ports based on ODP capacity
-        const ports = Array.from({ length: selectedOdp.total_ports }, (_, i) => i + 1);
-        setAvailablePorts(ports);
-        setSelectedOdpDetails(selectedOdp);
-        
         setFormData(prev => ({
           ...prev,
           odp_id: odpId,
-          latitude: selectedOdp.latitude,
-          longitude: selectedOdp.longitude,
+          // Jika lat/long pelanggan kosong, pakai lat/long ODP sebagai default view
+          latitude: prev.latitude ?? selectedOdp.latitude,
+          longitude: prev.longitude ?? selectedOdp.longitude,
         }));
       }
     } else {
-      setAvailablePorts([]);
-      setSelectedOdpDetails(null);
-      setFormData(prev => ({
-        ...prev,
-        odp_id: null,
-        latitude: null,
-        longitude: null,
-      }));
+      setFormData(prev => ({ ...prev, odp_id: 0 }));
     }
   };
 
@@ -251,7 +220,6 @@ const Customers: React.FC = () => {
     }
   };
 
-  // Filter customers
   const filteredCustomers = customers.filter(customer => {
     const matchesSearch = 
       customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -269,37 +237,13 @@ const Customers: React.FC = () => {
     window.open(`https://www.google.com/maps?q=${encodeURIComponent(address)}`, '_blank');
   };
 
-  // Loading state
   if (loading) {
     return (
       <Layout>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <Loader2 className="animate-spin h-12 w-12 text-blue-600" />
             <span className="ml-3 text-gray-600">Memuat data pelanggan...</span>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <Layout>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <div className="flex items-center">
-              <AlertCircle className="w-6 h-6 text-red-600 mr-2" />
-              <h3 className="text-lg font-medium text-red-800">Terjadi Kesalahan</h3>
-            </div>
-            <p className="mt-2 text-red-700">{error}</p>
-            <button
-              onClick={fetchData}
-              className="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Coba Lagi
-            </button>
           </div>
         </div>
       </Layout>
@@ -449,14 +393,14 @@ const Customers: React.FC = () => {
                   <Network className="w-4 h-4 mr-2" />
                   <span className="font-medium">ODP:</span>
                   <span className="ml-1">
-                    {odps.find(o => o.id === customer.odp_id)?.name || 'Tidak diketahui'}
+                    {customer.odp ? customer.odp.name : (odps.find(o => o.id === customer.odp_id)?.name || 'Tidak diketahui')}
                   </span>
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
-                  <Package className="w-4 h-4 mr-2" />
+                  <PackageIcon className="w-4 h-4 mr-2" />
                   <span className="font-medium">Paket:</span>
                   <span className="ml-1">
-                    {packages.find(p => p.id === customer.package_id)?.name || 'Tidak diketahui'}
+                    {customer.package ? customer.package.name : (packages.find(p => p.id === customer.package_id)?.name || 'Tidak diketahui')}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600">
@@ -474,11 +418,11 @@ const Customers: React.FC = () => {
                     className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
                   >
                     <MapPin className="w-4 h-4 mr-1" />
-                    Google Maps
+                    Maps
                   </button>
                   {customer.latitude && customer.longitude && (
                     <button
-                      onClick={() => alert(`Koordinat: ${customer.latitude?.toFixed(6)}, ${customer.longitude?.toFixed(6)}`)}
+                      onClick={() => alert(`Koordinat: ${Number(customer.latitude).toFixed(6)}, ${Number(customer.longitude).toFixed(6)}`)}
                       className="text-green-600 hover:text-green-800 text-sm flex items-center"
                     >
                       <MapPin className="w-4 h-4 mr-1" />
@@ -574,22 +518,67 @@ const Customers: React.FC = () => {
                     <textarea
                       value={formData.address || ''}
                       onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                      rows={3}
+                      rows={2}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       required
                     />
+                  </div>
+
+                  {/* --- BAGIAN PETA LEAFLET YANG DIPERBAIKI --- */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <MapPin className="inline w-4 h-4 mr-1" />
+                      Pilih Lokasi Rumah (Geser Peta)
+                    </label>
+                    <div className="h-64 w-full rounded-lg overflow-hidden border border-gray-300 z-0 relative">
+                        <MapPicker 
+                            onLocationSelect={handleLocationSelect}
+                            initialLat={formData.latitude}
+                            initialLng={formData.longitude}
+                            height="100%"
+                        />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                        *Geser peta untuk menempatkan marker di lokasi yang tepat.
+                    </p>
+                  </div>
+                  {/* ------------------------------------------- */}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={formData.latitude || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, latitude: parseFloat(e.target.value) || null }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                        placeholder="-6.xxxxx"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={formData.longitude || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, longitude: parseFloat(e.target.value) || null }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                        placeholder="106.xxxxx"
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">ODP *</label>
                       <select
-                        value={formData.odp_id || ''}
-                        onChange={(e) => handleOdpChange(e.target.value ? parseInt(e.target.value) : null)}
+                        value={formData.odp_id || 0}
+                        onChange={(e) => handleOdpChange(e.target.value ? parseInt(e.target.value) : 0)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       >
-                        <option value="">Pilih ODP</option>
+                        <option value={0}>Pilih ODP</option>
                         {odps.map((odp) => (
                           <option key={odp.id} value={odp.id}>
                             {odp.name} - {odp.location}
@@ -600,15 +589,15 @@ const Customers: React.FC = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Paket Layanan *</label>
                       <select
-                        value={formData.package_id || ''}
-                        onChange={(e) => setFormData(prev => ({ ...prev, package_id: e.target.value ? parseInt(e.target.value) : null }))}
+                        value={formData.package_id || 0}
+                        onChange={(e) => setFormData(prev => ({ ...prev, package_id: e.target.value ? parseInt(e.target.value) : 0 }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       >
-                        <option value="">Pilih Paket</option>
+                        <option value={0}>Pilih Paket</option>
                         {packages.map((pkg) => (
                           <option key={pkg.id} value={pkg.id}>
-                            {pkg.name} - {pkg.speed} (Rp {pkg.price.toLocaleString()})
+                            {pkg.name} - {pkg.speed} Mbps (Rp {Number(pkg.price).toLocaleString()})
                           </option>
                         ))}
                       </select>
@@ -640,7 +629,7 @@ const Customers: React.FC = () => {
                       className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                       disabled={submitting}
                     >
-                      {submitting ? 'Menyimpan...' : (editingCustomer ? 'Update' : 'Simpan')}
+                      {submitting ? <Loader2 className="animate-spin h-5 w-5" /> : (editingCustomer ? 'Update' : 'Simpan')}
                     </button>
                   </div>
                 </form>
