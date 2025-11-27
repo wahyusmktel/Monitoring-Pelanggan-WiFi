@@ -129,6 +129,12 @@ export interface PaymentMonitoringData {
 }
 
 export const servicesService = {
+  // Dashboard Data
+  getDashboardData: async () => {
+    const response = await apiClient.get('/dashboard');
+    return response.data;
+  },
+
   // Package Services
   getPackages: async (): Promise<Package[]> => {
     try {

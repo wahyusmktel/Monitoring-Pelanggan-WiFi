@@ -9,6 +9,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\Infrastructure\PortMonitoringController;
 use App\Http\Controllers\Infrastructure\NetworkMapController;
 use App\Http\Controllers\Services\PaymentController;
+use App\Http\Controllers\DashboardController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -22,6 +23,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
+
+    // Dashboard
+    Route::get('/dashboard', [DashboardController::class, 'index']);
 
     // OLT Routes
     Route::prefix('infrastructure')->group(function () {
