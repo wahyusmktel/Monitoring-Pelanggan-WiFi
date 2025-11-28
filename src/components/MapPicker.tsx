@@ -93,7 +93,7 @@ const MapPicker: React.FC<MapPickerProps> = ({
   height = '100%' 
 }) => {
   // Default Jakarta
-  const defaultCenter = new L.LatLng(-6.2088, 106.8456);
+  const defaultCenter = new L.LatLng(-5.37491, 105.08024);
   
   // State lokal untuk posisi marker
   const [currentPosition, setCurrentPosition] = useState<L.LatLng>(
