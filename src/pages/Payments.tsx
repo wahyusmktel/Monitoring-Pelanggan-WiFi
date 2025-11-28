@@ -16,6 +16,8 @@ import {
   AlertCircle,
   RefreshCw,
   Loader2,
+  Settings,
+  Power,
 } from "lucide-react";
 import { servicesService, Payment } from "@/services/servicesService"; // Import service & types
 import { toast } from "sonner";
@@ -38,6 +40,16 @@ const Payments: React.FC = () => {
   const [billingMonth, setBillingMonth] = useState(new Date().getMonth() + 1);
   const [billingYear, setBillingYear] = useState(new Date().getFullYear());
 
+  // --- STATE BARU UNTUK SETTING ---
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [billingSettings, setBillingSettings] = useState<BillingSettings>({
+    is_active: false,
+    generate_day: 1,
+    generate_time: '09:00',
+    is_recurring: true
+  });
+
   // --- 1. FETCH DATA ---
   const fetchPayments = async () => {
     try {
@@ -52,8 +64,34 @@ const Payments: React.FC = () => {
     }
   };
 
+  // --- FUNGSI BARU: FETCH SETTING ---
+  const fetchSettings = async () => {
+    try {
+      const settings = await servicesService.getBillingSettings();
+      setBillingSettings(settings);
+    } catch (error) {
+      console.error("Gagal memuat setting");
+    }
+  };
+
+  // --- FUNGSI BARU: SIMPAN SETTING ---
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingSettings(true);
+    try {
+      await servicesService.updateBillingSettings(billingSettings);
+      toast.success("Pengaturan tagihan otomatis berhasil disimpan");
+      setShowSettingsModal(false);
+    } catch (error) {
+      toast.error("Gagal menyimpan pengaturan");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   useEffect(() => {
     fetchPayments();
+    fetchSettings();
   }, []);
 
   // --- 2. GENERATE BILLING ---
@@ -304,6 +342,13 @@ const Payments: React.FC = () => {
             </p>
           </div>
           <div className="flex space-x-3">
+          <button
+              onClick={() => setShowSettingsModal(true)}
+              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Setting Otomatis
+            </button>
             <button
               onClick={() => setShowBillingModal(true)}
               className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center"
@@ -596,6 +641,108 @@ const Payments: React.FC = () => {
             </p>
           </div>
         )}
+
+        {/* --- MODAL SETTING BARU --- */}
+        {showSettingsModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-lg max-w-md w-full">
+                    <div className="p-6">
+                        <div className="flex items-center mb-6">
+                            <Settings className="w-6 h-6 text-gray-700 mr-2" />
+                            <h2 className="text-2xl font-bold text-gray-900">Pengaturan Otomatisasi</h2>
+                        </div>
+
+                        <form onSubmit={handleSaveSettings} className="space-y-5">
+                            
+                            {/* SWITCH AKTIF/NONAKTIF */}
+                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                <div>
+                                    <label className="font-medium text-gray-900 block">Status Otomatisasi</label>
+                                    <span className="text-xs text-gray-500">Aktifkan generate tagihan otomatis</span>
+                                </div>
+                                <button 
+                                    type="button"
+                                    onClick={() => setBillingSettings(prev => ({...prev, is_active: !prev.is_active}))}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${billingSettings.is_active ? 'bg-green-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${billingSettings.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+
+                            {/* FORM SETTING */}
+                            <div className={`space-y-4 transition-all duration-300 ${billingSettings.is_active ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Eksekusi (Tiap Bulan)</label>
+                                    <select 
+                                        value={billingSettings.generate_day}
+                                        onChange={(e) => setBillingSettings({...billingSettings, generate_day: parseInt(e.target.value)})}
+                                        className="w-full border-gray-300 rounded-lg border p-2"
+                                    >
+                                        {[...Array(28)].map((_, i) => (
+                                            <option key={i} value={i+1}>Tanggal {i+1}</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-gray-500 mt-1">Disarankan tanggal 1-5 awal bulan.</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Jam Eksekusi</label>
+                                    <input 
+                                        type="time" 
+                                        value={billingSettings.generate_time}
+                                        onChange={(e) => setBillingSettings({...billingSettings, generate_time: e.target.value})}
+                                        className="w-full border-gray-300 rounded-lg border p-2"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Tipe Pengulangan</label>
+                                    <div className="flex space-x-4">
+                                        <label className="flex items-center">
+                                            <input 
+                                                type="radio" 
+                                                checked={billingSettings.is_recurring} 
+                                                onChange={() => setBillingSettings({...billingSettings, is_recurring: true})}
+                                                className="mr-2 text-blue-600"
+                                            />
+                                            <span className="text-sm text-gray-700">Setiap Bulan</span>
+                                        </label>
+                                        <label className="flex items-center">
+                                            <input 
+                                                type="radio" 
+                                                checked={!billingSettings.is_recurring} 
+                                                onChange={() => setBillingSettings({...billingSettings, is_recurring: false})}
+                                                className="mr-2 text-blue-600"
+                                            />
+                                            <span className="text-sm text-gray-700">Sekali Saja</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end space-x-3 pt-4 border-t">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSettingsModal(false)}
+                                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={savingSettings}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+                                >
+                                    {savingSettings ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : null}
+                                    Simpan Pengaturan
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        )}
+        {/* -------------------------- */}
 
         {/* Billing Generation Modal */}
         {showBillingModal && (

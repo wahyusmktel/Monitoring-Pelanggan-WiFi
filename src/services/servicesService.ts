@@ -95,6 +95,16 @@ export interface Payment {
   subscription?: { package?: { name: string } }; // Nested relation buat nama paket
 }
 
+// Interface untuk Setting Auto Billing
+export interface BillingSettings {
+  id?: number;
+  is_active: boolean;
+  generate_day: number; // Tanggal eksekusi (1-28)
+  generate_time: string; // Jam eksekusi (Format HH:mm)
+  is_recurring: boolean; // True = Tiap bulan, False = Sekali saja
+  next_run_date?: string; // Tanggal jalan berikutnya (dari backend)
+}
+
 // Tambahkan Interface Response Monitoring
 export interface PaymentMonitoringData {
   summary: {
@@ -160,6 +170,33 @@ export const servicesService = {
   getPaymentMonitoring: async (): Promise<PaymentMonitoringData> => {
     const response = await apiClient.get("/services/payments/monitoring");
     return response.data;
+  },
+
+  // --- BILLING SETTINGS ---
+  getBillingSettings: async (): Promise<BillingSettings> => {
+    try {
+      const response = await apiClient.get('/services/billing-settings');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching billing settings:', error);
+      // Return default value jika belum ada setting di DB
+      return {
+        is_active: false,
+        generate_day: 1,
+        generate_time: '09:00',
+        is_recurring: true
+      };
+    }
+  },
+
+  updateBillingSettings: async (settings: BillingSettings): Promise<BillingSettings> => {
+    try {
+      const response = await apiClient.post('/services/billing-settings', settings);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating billing settings:', error);
+      throw error;
+    }
   },
 
   createPackage: async (pkg: PackageCreate): Promise<Package> => {

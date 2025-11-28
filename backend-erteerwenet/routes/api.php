@@ -10,6 +10,7 @@ use App\Http\Controllers\Infrastructure\PortMonitoringController;
 use App\Http\Controllers\Infrastructure\NetworkMapController;
 use App\Http\Controllers\Services\PaymentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Services\BillingSettingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -79,6 +80,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Monitoring Route (Letakkan SEBELUM route dengan {id})
         Route::get('/payments/monitoring', [PaymentController::class, 'monitoring']);
+
+        Route::get('/billing-settings', [BillingSettingController::class, 'show']);
+        Route::post('/billing-settings', [BillingSettingController::class, 'update']);
     });
 
     // Route khusus ODP Available (sesuai frontend service path: /odps/available)
