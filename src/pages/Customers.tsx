@@ -733,22 +733,23 @@ const Customers: React.FC = () => {
                     />
                   </div>
 
-                  {/* --- BAGIAN PETA LEAFLET YANG DIPERBAIKI --- */}
+                  {/* --- BAGIAN PETA LEAFLET YANG DIPERBAIKI (LEBIH TINGGI) --- */}
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       <MapPin className="inline w-4 h-4 mr-1" />
                       Pilih Lokasi Rumah (Geser Peta)
                     </label>
-                    <div className="h-64 w-full rounded-lg overflow-hidden border border-gray-300 z-0 relative">
-                      <MapPicker
-                        onLocationSelect={handleLocationSelect}
-                        initialLat={formData.latitude}
-                        initialLng={formData.longitude}
-                        height="100%"
-                      />
+                    {/* UBAH DISINI: h-64 menjadi h-96 (atau h-[500px] jika ingin lebih tinggi lagi) */}
+                    <div className="h-96 w-full rounded-lg overflow-hidden border border-gray-300 z-0 relative">
+                        <MapPicker 
+                            onLocationSelect={handleLocationSelect}
+                            initialLat={formData.latitude}
+                            initialLng={formData.longitude}
+                            height="100%"
+                        />
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      *Geser peta untuk menempatkan marker di lokasi yang tepat.
+                        *Geser peta untuk menempatkan marker di lokasi yang tepat.
                     </p>
                   </div>
                   {/* ------------------------------------------- */}
