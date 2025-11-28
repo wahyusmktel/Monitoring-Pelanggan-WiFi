@@ -1,5 +1,6 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { 
   Home, 
   Users, 
@@ -23,6 +24,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [serverMenuOpen, setServerMenuOpen] = React.useState(false);
 
@@ -40,6 +42,26 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const isActive = (path: string) => {
     return location.pathname === path;
+  };
+
+  // --- FUNGSI LOGOUT ---
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+
+      if (token) {
+        await axios.post(`${apiUrl}/logout`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+    } catch (error) {
+      console.error("Logout failed on server", error);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      navigate('/');
+    }
   };
 
   return (
@@ -222,7 +244,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </nav>
         
         <div className="absolute bottom-0 w-full px-3 py-4 border-t border-gray-200">
-          <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg w-full transition-colors duration-200">
+          <button onClick={handleLogout} className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg w-full transition-colors duration-200">
             <LogOut className="mr-3 h-5 w-5" />
             Keluar
           </button>
