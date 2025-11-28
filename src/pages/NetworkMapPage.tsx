@@ -355,15 +355,18 @@ const NetworkMapPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Container Peta dengan CSS Manual */}
-          <NetworkMap
-            locations={filteredLocations as any}
-            height="600px" // Peta + Legend total tingginya akan 600px
-            center={mapCenter}
-            zoom={13}
-            showCoverage={showCoverage}
-            coverageRadius={coverageRadius}
-          />
+          {/* PERBAIKAN: Bungkus dengan DIV yang punya tinggi eksplisit (h-[600px]) */}
+          <div className="h-[600px] w-full border border-gray-200 rounded-lg overflow-hidden relative z-0">
+             <NetworkMap
+               locations={filteredLocations as any}
+               height="100%" // Ubah ini jadi 100% agar mengikuti wrapper di atas
+               center={mapCenter}
+               zoom={13}
+               showCoverage={showCoverage}
+               coverageRadius={coverageRadius}
+             />
+          </div>
+          
         </div>
       </div>
     </Layout>
