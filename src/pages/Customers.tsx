@@ -14,6 +14,8 @@ import {
   AlertCircle,
   Loader2,
   Power,
+  FileText,
+  Download,
 } from "lucide-react";
 import MapPicker from "@/components/MapPicker";
 import {
@@ -37,6 +39,7 @@ const Customers: React.FC = () => {
 
   // State untuk form dan UI
   const [showForm, setShowForm] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -206,6 +209,31 @@ const Customers: React.FC = () => {
     }
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Reset value agar bisa upload file yang sama jika gagal sebelumnya
+    event.target.value = '';
+
+    const toastId = toast.loading('Sedang mengimport data...');
+
+    try {
+      await customerService.importCustomers(file);
+      toast.dismiss(toastId);
+      toast.success('Import berhasil! Data pelanggan telah ditambahkan.');
+      fetchData(); // Refresh tabel
+    } catch (error: any) {
+      toast.dismiss(toastId);
+      const msg = error.response?.data?.message || 'Gagal mengimport file.';
+      toast.error(msg);
+    }
+  };
+
   // --- FUNGSI BARU: AKTIVASI PELANGGAN ---
   const handleActivate = async (customer: Customer) => {
     if (
@@ -319,6 +347,31 @@ const Customers: React.FC = () => {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Data Pelanggan</h1>
+          {/* --- TOMBOL DOWNLOAD TEMPLATE --- */}
+          <button
+              onClick={customerService.downloadTemplate}
+              className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center border border-gray-300"
+              title="Download Template Excel/CSV"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Template
+            </button>
+
+            {/* --- TOMBOL IMPORT --- */}
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                className="hidden" 
+                accept=".xlsx,.xls,.csv" 
+            />
+            <button
+              onClick={handleImportClick}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Import Excel
+            </button>
           <button
             onClick={() => setShowForm(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"

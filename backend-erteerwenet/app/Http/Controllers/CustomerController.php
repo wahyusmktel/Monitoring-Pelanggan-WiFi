@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Imports\CustomersImport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
@@ -135,5 +137,23 @@ class CustomerController extends Controller
             'pending' => Customer::where('status', 'pending')->count(),
             'inactive' => Customer::where('status', 'inactive')->count(),
         ]);
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls,csv'
+        ]);
+
+        try {
+            Excel::import(new CustomersImport, $request->file('file'));
+            return response()->json(['message' => 'Data pelanggan berhasil diimport!']);
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $failures = $e->failures();
+            $errorMsg = "Gagal pada baris: " . $failures[0]->row() . ". " . $failures[0]->errors()[0];
+            return response()->json(['message' => $errorMsg], 422);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Gagal import: ' . $e->getMessage()], 500);
+        }
     }
 }

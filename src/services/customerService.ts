@@ -1,3 +1,4 @@
+import { apiClient } from '.';
 import api from './api';
 
 export interface Customer {
@@ -82,6 +83,40 @@ export const customerService = {
       throw error;
     }
   },
+
+  // Import Customer
+  importCustomers: async (file: File): Promise<any> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await apiClient.post('/customers/import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error importing customers:', error);
+      throw error;
+    }
+  },
+  
+  // Download Template (Updated: No ODP/Package, Add Lat/Long)
+  downloadTemplate: () => {
+    // Header CSV baru
+    const headers = "name,email,phone,address,latitude,longitude";
+    // Contoh data dummy dengan koordinat
+    const example = "Budi Santoso,budi@test.com,0812345678,Jl Merdeka No 1,-6.200000,106.800000";
+    
+    const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + example;
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "template_pelanggan_v2.csv");
+    document.body.appendChild(link);
+    link.click();
+ },
 
   // Create new customer
   createCustomer: async (customer: CustomerCreate): Promise<Customer> => {
