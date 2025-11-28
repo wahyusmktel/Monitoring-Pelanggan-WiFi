@@ -1,45 +1,22 @@
-import React, { useEffect } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  Circle,
-  useMap,
-} from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import React, { useState, useCallback, useEffect } from 'react';
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF, CircleF } from '@react-google-maps/api';
 
-// --- FIX ICON LEAFLET ---
-import icon from "leaflet/dist/images/marker-icon.png";
-import iconShadow from "leaflet/dist/images/marker-shadow.png";
-
-let DefaultIcon = L.icon({
-  iconUrl: icon,
-  shadowUrl: iconShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-L.Marker.prototype.options.icon = DefaultIcon;
-// ------------------------
-
-// Custom icons generator
-const createCustomIcon = (color: string) => {
-  return L.divIcon({
-    className: "custom-marker",
-    html: `<div style="background-color: ${color}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-  });
+// --- KONFIGURASI ICON GOOGLE MAPS ---
+const getMarkerIcon = (type: string) => {
+  // Menggunakan icon default Google Maps beda warna
+  switch (type.toLowerCase()) {
+    case 'customer': // Biru
+      return 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png';
+    case 'olt': // Merah
+      return 'http://maps.google.com/mapfiles/ms/icons/red-dot.png';
+    case 'odc': // Kuning
+      return 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png';
+    case 'odp': // Hijau
+      return 'http://maps.google.com/mapfiles/ms/icons/green-dot.png';
+    default:
+      return 'http://maps.google.com/mapfiles/ms/icons/red-dot.png';
+  }
 };
-
-const customerIcon = createCustomIcon("#3B82F6");
-const oltIcon = createCustomIcon("#EF4444");
-const odcIcon = createCustomIcon("#F59E0B");
-const odpIcon = createCustomIcon("#10B981");
 
 export interface MapLocation {
   id: string;
@@ -54,186 +31,176 @@ export interface MapLocation {
 
 interface NetworkMapProps {
   locations: MapLocation[];
-  height?: string;
+  height?: string; // Props ini diabaikan krn pakai flex-1
   center?: [number, number];
   zoom?: number;
   showCoverage?: boolean;
   coverageRadius?: number;
 }
 
-const MapUpdater: React.FC<{ center: [number, number]; zoom: number }> = ({
-  center,
-  zoom,
-}) => {
-  const map = useMap();
-  useEffect(() => {
-    if (center) {
-      map.setView(center, zoom);
-    }
-  }, [center, zoom, map]);
-  return null;
-};
-
-const NetworkMap: React.FC<NetworkMapProps> = ({
-  locations,
-  height = "600px",
-  center = [-5.3738973, 105.0782348],
+const NetworkMap: React.FC<NetworkMapProps> = ({ 
+  locations, 
+  center = [-5.3738973, 105.0782348], // Default Center (Lampung)
   zoom = 13,
   showCoverage = true,
-  coverageRadius = 1000,
+  coverageRadius = 1000 
 }) => {
-  const getIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "customer":
-        return customerIcon;
-      case "olt":
-        return oltIcon;
-      case "odc":
-        return odcIcon;
-      case "odp":
-        return odpIcon;
-      default:
-        return DefaultIcon;
+  
+  // Load Google Maps Script
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: 'AIzaSyDQSR0tu_uijvHsHMIMiMOcOVxbGIuPSpk', // API Key Kamu
+  });
+
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<MapLocation | null>(null);
+
+  const onLoad = useCallback(function callback(map: google.maps.Map) {
+    setMap(map);
+  }, []);
+
+  const onUnmount = useCallback(function callback(map: google.maps.Map) {
+    setMap(null);
+  }, []);
+
+  // Effect untuk update center saat props center berubah (Penting!)
+  useEffect(() => {
+    if (map && center) {
+      map.panTo({ lat: Number(center[0]), lng: Number(center[1]) });
+      map.setZoom(zoom);
     }
-  };
+  }, [map, center, zoom]);
 
   const getStatusColor = (status?: string) => {
-    if (!status) return "text-gray-600";
+    if (!status) return '#4B5563'; // Gray
     switch (status.toLowerCase()) {
-      case "active":
-        return "text-green-600";
-      case "inactive":
-        return "text-red-600";
-      case "maintenance":
-        return "text-yellow-600";
-      case "pending":
-        return "text-orange-500";
-      case "suspended":
-        return "text-gray-500";
-      default:
-        return "text-gray-600";
+      case 'active': return '#10B981'; // Green
+      case 'inactive': return '#EF4444'; // Red
+      case 'maintenance': return '#F59E0B'; // Yellow
+      case 'pending': return '#F97316'; // Orange
+      default: return '#4B5563';
     }
   };
 
-  const validLocations = locations.filter(
-    (loc) =>
-      loc.lat !== null &&
-      loc.lng !== null &&
-      !isNaN(Number(loc.lat)) &&
-      !isNaN(Number(loc.lng))
+  // Validasi koordinat
+  const validLocations = locations.filter(loc => 
+    loc.lat !== null && loc.lng !== null && !isNaN(Number(loc.lat)) && !isNaN(Number(loc.lng))
   );
 
+  if (!isLoaded) {
+    return <div className="flex items-center justify-center h-full bg-gray-100">Memuat Google Maps...</div>;
+  }
+
   return (
-    // PERUBAHAN UTAMA DI SINI:
-    // 1. Menggunakan flex flex-col agar children (Peta & Legend) tersusun vertikal
-    // 2. Height diterapkan di container utama ini
-    <div
-      className="w-full border border-gray-300 rounded-lg overflow-hidden relative z-0 flex flex-col"
-      style={{ height: height }}
-    >
-      {/* Container Peta: Diberi flex-1 agar memakan sisa ruang yang tersedia */}
-      <div className="flex-1 relative min-h-0">
-        <MapContainer
-          center={center}
+    <div className="w-full h-full flex flex-col border border-gray-300 rounded-lg overflow-hidden relative">
+      {/* Peta akan memenuhi sisa ruang (flex-1) */}
+      <div className="flex-1 relative">
+        <GoogleMap
+          mapContainerStyle={{ width: '100%', height: '100%' }}
+          center={{ lat: Number(center[0]), lng: Number(center[1]) }}
           zoom={zoom}
-          style={{ height: "100%", width: "100%" }} // Peta selalu 100% dari parent (flex-1)
+          onLoad={onLoad}
+          onUnmount={onUnmount}
+          options={{
+            streetViewControl: true,
+            mapTypeControl: true,
+            fullscreenControl: true,
+            mapTypeId: 'hybrid', // Default Tampilan Satelit Hybrid
+            mapId: "DEMO_MAP_ID" // Fix warning deprecated marker
+          }}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-
-          <MapUpdater center={center} zoom={zoom} />
-
           {validLocations.map((location) => (
             <React.Fragment key={location.id}>
-              <Marker
-                position={[Number(location.lat), Number(location.lng)]}
-                icon={getIcon(location.type)}
-              >
-                <Popup>
-                  <div className="p-2 min-w-[200px]">
-                    <h3 className="font-semibold text-gray-900">
-                      {location.name}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-2">
-                      {location.address ||
-                        `${Number(location.lat).toFixed(6)}, ${Number(
-                          location.lng
-                        ).toFixed(6)}`}
-                    </p>
-                    {location.status && (
-                      <p
-                        className={`text-sm ${getStatusColor(
-                          location.status
-                        )} font-medium capitalize`}
-                      >
-                        Status: {location.status}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-500 mt-1 capitalize">
-                      Tipe: {location.type.toUpperCase()}
-                    </p>
-                    {location.details && (
-                      <div className="mt-2 pt-2 border-t border-gray-200">
-                        {Object.entries(location.details).map(([key, value]) =>
-                          value ? (
-                            <p key={key} className="text-xs text-gray-600">
-                              <span className="font-medium">{key}:</span>{" "}
-                              {value}
-                            </p>
-                          ) : null
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </Popup>
-              </Marker>
+              {/* Marker */}
+              <MarkerF
+                position={{ lat: Number(location.lat), lng: Number(location.lng) }}
+                icon={{
+                  url: getMarkerIcon(location.type),
+                  scaledSize: new window.google.maps.Size(40, 40) // Ukuran icon
+                }}
+                onClick={() => setSelectedLocation(location)}
+              />
 
-              {showCoverage &&
-                ["olt", "odc", "odp"].includes(location.type.toLowerCase()) && (
-                  <Circle
-                    center={[Number(location.lat), Number(location.lng)]}
-                    radius={coverageRadius}
-                    pathOptions={{
-                      color:
-                        location.type.toLowerCase() === "olt"
-                          ? "#EF4444"
-                          : location.type.toLowerCase() === "odc"
-                          ? "#F59E0B"
-                          : "#10B981",
-                      weight: 1,
-                      opacity: 0.3,
-                      fillOpacity: 0.1,
-                    }}
-                  />
-                )}
+              {/* Coverage Radius (Lingkaran) */}
+              {showCoverage && ['olt', 'odc', 'odp'].includes(location.type.toLowerCase()) && (
+                <CircleF
+                  center={{ lat: Number(location.lat), lng: Number(location.lng) }}
+                  radius={coverageRadius}
+                  options={{
+                    strokeColor: location.type.toLowerCase() === 'olt' ? '#EF4444' : 
+                                 location.type.toLowerCase() === 'odc' ? '#F59E0B' : '#10B981',
+                    strokeOpacity: 0.8,
+                    strokeWeight: 1,
+                    fillColor: location.type.toLowerCase() === 'olt' ? '#EF4444' : 
+                               location.type.toLowerCase() === 'odc' ? '#F59E0B' : '#10B981',
+                    fillOpacity: 0.15,
+                  }}
+                />
+              )}
             </React.Fragment>
           ))}
-        </MapContainer>
+
+          {/* Info Window (Popup saat marker diklik) */}
+          {selectedLocation && (
+            <InfoWindowF
+              position={{ lat: Number(selectedLocation.lat), lng: Number(selectedLocation.lng) }}
+              onCloseClick={() => setSelectedLocation(null)}
+              options={{ pixelOffset: new window.google.maps.Size(0, -40) }}
+            >
+              <div className="p-1 min-w-[200px]">
+                <h3 className="font-bold text-gray-900 text-base mb-1">{selectedLocation.name}</h3>
+                <p className="text-xs text-gray-600 mb-2">
+                  {selectedLocation.address || `${Number(selectedLocation.lat).toFixed(6)}, ${Number(selectedLocation.lng).toFixed(6)}`}
+                </p>
+                
+                <div className="flex items-center gap-2 mb-2">
+                   <span className="px-2 py-0.5 rounded text-[10px] font-bold text-white uppercase" style={{ backgroundColor: getStatusColor(selectedLocation.status) }}>
+                      {selectedLocation.status || 'Unknown'}
+                   </span>
+                   <span className="text-xs text-gray-500 border border-gray-300 px-2 py-0.5 rounded uppercase">
+                      {selectedLocation.type}
+                   </span>
+                </div>
+
+                {selectedLocation.details && (
+                  <div className="mt-2 pt-2 border-t border-gray-200">
+                    {Object.entries(selectedLocation.details).map(([key, value]) => (
+                      value ? (
+                        <div key={key} className="flex justify-between text-xs mb-1">
+                          <span className="text-gray-500 font-medium">{key}:</span>
+                          <span className="text-gray-800 font-semibold">{value}</span>
+                        </div>
+                      ) : null
+                    ))}
+                  </div>
+                )}
+              </div>
+            </InfoWindowF>
+          )}
+        </GoogleMap>
       </div>
 
-      {/* Legend: Diberi shrink-0 agar ukurannya tidak mengecil, tetap di bawah */}
-      <div className="p-4 bg-gray-50 border-t border-gray-300 shrink-0">
-        <div className="flex flex-wrap gap-4 text-sm">
+      {/* Legend */}
+      <div className="p-4 bg-white border-t border-gray-300 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-10 relative">
+        <div className="flex flex-wrap gap-6 text-sm justify-center">
           <div className="flex items-center">
-            <div className="w-4 h-4 rounded-full bg-blue-500 mr-2 border-2 border-white shadow-sm"></div>
+            <img src="http://maps.google.com/mapfiles/ms/icons/blue-dot.png" className="w-5 h-5 mr-2" alt="Pelanggan" />
             <span>Pelanggan</span>
           </div>
           <div className="flex items-center">
-            <div className="w-4 h-4 rounded-full bg-red-500 mr-2 border-2 border-white shadow-sm"></div>
+            <img src="http://maps.google.com/mapfiles/ms/icons/red-dot.png" className="w-5 h-5 mr-2" alt="OLT" />
             <span>OLT</span>
           </div>
           <div className="flex items-center">
-            <div className="w-4 h-4 rounded-full bg-yellow-500 mr-2 border-2 border-white shadow-sm"></div>
+            <img src="http://maps.google.com/mapfiles/ms/icons/yellow-dot.png" className="w-5 h-5 mr-2" alt="ODC" />
             <span>ODC</span>
           </div>
           <div className="flex items-center">
-            <div className="w-4 h-4 rounded-full bg-green-500 mr-2 border-2 border-white shadow-sm"></div>
+            <img src="http://maps.google.com/mapfiles/ms/icons/green-dot.png" className="w-5 h-5 mr-2" alt="ODP" />
             <span>ODP</span>
           </div>
         </div>
-        <div className="mt-2 text-xs text-gray-600">
+        <div className="mt-2 text-center text-xs text-gray-500">
           Total: {validLocations.length} lokasi valid ditampilkan
         </div>
       </div>
