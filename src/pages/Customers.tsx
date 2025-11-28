@@ -16,6 +16,7 @@ import {
   Power,
   FileText,
   Download,
+  Activity,
 } from "lucide-react";
 import MapPicker from "@/components/MapPicker";
 import {
@@ -39,6 +40,10 @@ const Customers: React.FC = () => {
 
   // State untuk form dan UI
   const [showForm, setShowForm] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [newStatus, setNewStatus] = useState<string>("");
+  const [customerToUpdateStatus, setCustomerToUpdateStatus] =
+    useState<Customer | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -213,23 +218,25 @@ const Customers: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     // Reset value agar bisa upload file yang sama jika gagal sebelumnya
-    event.target.value = '';
+    event.target.value = "";
 
-    const toastId = toast.loading('Sedang mengimport data...');
+    const toastId = toast.loading("Sedang mengimport data...");
 
     try {
       await customerService.importCustomers(file);
       toast.dismiss(toastId);
-      toast.success('Import berhasil! Data pelanggan telah ditambahkan.');
+      toast.success("Import berhasil! Data pelanggan telah ditambahkan.");
       fetchData(); // Refresh tabel
     } catch (error: any) {
       toast.dismiss(toastId);
-      const msg = error.response?.data?.message || 'Gagal mengimport file.';
+      const msg = error.response?.data?.message || "Gagal mengimport file.";
       toast.error(msg);
     }
   };
@@ -258,6 +265,37 @@ const Customers: React.FC = () => {
     }
   };
   // ---------------------------------------
+
+  // --- FUNGSI UBAH STATUS (SUSPEND/INACTIVE/ACTIVE) ---
+  const openStatusModal = (customer: Customer) => {
+    setCustomerToUpdateStatus(customer);
+    setNewStatus(customer.status); // Set default ke status saat ini
+    setShowStatusModal(true);
+  };
+
+  const handleSaveStatus = async () => {
+    if (!customerToUpdateStatus || !newStatus) return;
+
+    try {
+      setSubmitting(true);
+      await customerService.updateCustomer(customerToUpdateStatus.id!, {
+        status: newStatus,
+        // Jika status inactive/suspended, set is_active false, jika active set true
+        is_active: newStatus === "active",
+      });
+
+      toast.success(`Status pelanggan berhasil diubah menjadi ${newStatus}`);
+      fetchData(); // Refresh data
+      setShowStatusModal(false);
+      setCustomerToUpdateStatus(null);
+    } catch (err) {
+      console.error("Error updating status:", err);
+      toast.error("Gagal mengubah status pelanggan");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  // ----------------------------------------------------
 
   const handleOdpChange = (odpId: number | null) => {
     if (odpId) {
@@ -349,29 +387,29 @@ const Customers: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900">Data Pelanggan</h1>
           {/* --- TOMBOL DOWNLOAD TEMPLATE --- */}
           <button
-              onClick={customerService.downloadTemplate}
-              className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center border border-gray-300"
-              title="Download Template Excel/CSV"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Template
-            </button>
+            onClick={customerService.downloadTemplate}
+            className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center border border-gray-300"
+            title="Download Template Excel/CSV"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Template
+          </button>
 
-            {/* --- TOMBOL IMPORT --- */}
-            <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileChange} 
-                className="hidden" 
-                accept=".xlsx,.xls,.csv" 
-            />
-            <button
-              onClick={handleImportClick}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Import Excel
-            </button>
+          {/* --- TOMBOL IMPORT --- */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+            accept=".xlsx,.xls,.csv"
+          />
+          <button
+            onClick={handleImportClick}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Import Excel
+          </button>
           <button
             onClick={() => setShowForm(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
@@ -595,6 +633,15 @@ const Customers: React.FC = () => {
                     </button>
                   )}
                   {/* --------------------------- */}
+                  {/* --- TOMBOL UBAH STATUS --- */}
+                  <button
+                    onClick={() => openStatusModal(customer)}
+                    className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-colors"
+                    title="Ubah Status"
+                  >
+                    <Activity className="w-4 h-4" />
+                  </button>
+                  {/* -------------------------- */}
                   <button
                     onClick={() => handleEdit(customer)}
                     className="bg-yellow-500 text-white p-2 rounded hover:bg-yellow-600 transition-colors"
@@ -624,6 +671,57 @@ const Customers: React.FC = () => {
             </p>
           </div>
         )}
+
+        {/* --- MODAL UBAH STATUS --- */}
+        {showStatusModal && customerToUpdateStatus && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-sm w-full p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">
+                Ubah Status Pelanggan
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Ubah status untuk <strong>{customerToUpdateStatus.name}</strong>
+              </p>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pilih Status Baru
+                </label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="active">Aktif (Active)</option>
+                  <option value="suspended">Isolir (Suspended)</option>
+                  <option value="inactive">Non-Aktif (Inactive)</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowStatusModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  disabled={submitting}
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleSaveStatus}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                  ) : null}
+                  Simpan
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* ------------------------- */}
 
         {/* Form Modal */}
         {showForm && (
@@ -741,15 +839,15 @@ const Customers: React.FC = () => {
                     </label>
                     {/* UBAH DISINI: h-64 menjadi h-96 (atau h-[500px] jika ingin lebih tinggi lagi) */}
                     <div className="h-96 w-full rounded-lg overflow-hidden border border-gray-300 z-0 relative">
-                        <MapPicker 
-                            onLocationSelect={handleLocationSelect}
-                            initialLat={formData.latitude}
-                            initialLng={formData.longitude}
-                            height="100%"
-                        />
+                      <MapPicker
+                        onLocationSelect={handleLocationSelect}
+                        initialLat={formData.latitude}
+                        initialLng={formData.longitude}
+                        height="100%"
+                      />
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                        *Geser peta untuk menempatkan marker di lokasi yang tepat.
+                      *Geser peta untuk menempatkan marker di lokasi yang tepat.
                     </p>
                   </div>
                   {/* ------------------------------------------- */}
