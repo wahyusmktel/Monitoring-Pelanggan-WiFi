@@ -11,18 +11,20 @@ import Payments from "@/pages/Payments";
 import PaymentMonitoring from "@/pages/PaymentMonitoring";
 import Settings from "@/pages/Settings";
 import NetworkMapPage from "@/pages/NetworkMapPage";
+import CustomerLogin from "@/pages/portal/CustomerLogin";
+import CustomerChangePassword from "@/pages/portal/CustomerChangePassword";
+import CustomerDashboard from "@/pages/portal/CustomerDashboard";
 
-// --- KOMPONEN SATPAM (PROTECTED ROUTE) ---
-const ProtectedRoute = () => {
+// --- SATPAM ADMIN (Cek 'token') ---
+const AdminRoute = () => {
   const token = localStorage.getItem('token');
-  
-  // Jika tidak ada token, tendang ke halaman Login
-  if (!token) {
-    return <Navigate to="/" replace />;
-  }
+  return token ? <Outlet /> : <Navigate to="/" replace />;
+};
 
-  // Jika ada, izinkan masuk ke halaman anak (Outlet)
-  return <Outlet />;
+// --- SATPAM PELANGGAN (Cek 'customer_token') ---
+const CustomerRoute = () => {
+  const token = localStorage.getItem('customer_token');
+  return token ? <Outlet /> : <Navigate to="/portal/login" replace />;
 };
 
 export default function App() {
@@ -32,7 +34,7 @@ export default function App() {
         {/* Halaman Public (Login) */}
         <Route path="/" element={<Login />} />
           {/* Semua route di dalam sini dilindungi oleh ProtectedRoute */}
-        <Route element={<ProtectedRoute />}>
+        <Route element={<AdminRoute />}>
           <Route path="/dashboard" element={<Home />} />
           <Route path="/customers" element={<Customers />} />
           <Route path="/subscriptions" element={<Subscriptions />} />
@@ -45,6 +47,13 @@ export default function App() {
           <Route path="/network-map" element={<NetworkMapPage />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/other" element={<div className="text-center text-xl">Other Page - Coming Soon</div>} />
+        </Route>
+        {/* --- AREA PELANGGAN (PORTAL) --- */}
+        <Route path="/portal/login" element={<CustomerLogin />} />
+        
+        <Route element={<CustomerRoute />}>
+            <Route path="/portal/change-password" element={<CustomerChangePassword />} />
+            <Route path="/portal/dashboard" element={<CustomerDashboard />} />
         </Route>
       </Routes>
     </Router>

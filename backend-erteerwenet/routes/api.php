@@ -11,6 +11,7 @@ use App\Http\Controllers\Infrastructure\NetworkMapController;
 use App\Http\Controllers\Services\PaymentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Services\BillingSettingController;
+use App\Http\Controllers\CustomerPortal\AuthController as CustomerAuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -95,4 +96,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/customers/{id}', [CustomerController::class, 'show']);
     Route::put('/customers/{id}', [CustomerController::class, 'update']);
     Route::delete('/customers/{id}', [CustomerController::class, 'destroy']);
+});
+
+// Group khusus Customer Portal
+Route::prefix('portal')->group(function () {
+    Route::post('/login', [CustomerAuthController::class, 'login']);
+
+    // Protected Routes (Harus punya token customer)
+    Route::middleware(['auth:sanctum', 'ability:customer_token'])->group(function () { // atau cukup auth:sanctum jika tidak pakai ability spesifik
+        Route::get('/dashboard', [CustomerAuthController::class, 'dashboard']);
+        Route::post('/change-password', [CustomerAuthController::class, 'changePassword']);
+    });
 });

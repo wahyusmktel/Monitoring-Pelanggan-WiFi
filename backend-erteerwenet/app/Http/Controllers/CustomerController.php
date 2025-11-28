@@ -105,8 +105,13 @@ class CustomerController extends Controller
                 $nextId = 790001;
             }
 
-            // Masukkan ke array validated untuk di-update
-            $validated['customer_number'] = (string) $nextId;
+            $newId = (string) $nextId;
+
+            $validated['customer_number'] = $newId;
+
+            // Password default = ID Pelanggan
+            $validated['password'] = \Illuminate\Support\Facades\Hash::make($newId);
+            $validated['must_change_password'] = true;
         }
 
         $customer->update($validated);
