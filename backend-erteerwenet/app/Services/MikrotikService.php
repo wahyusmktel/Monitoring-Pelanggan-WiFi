@@ -9,111 +9,37 @@ use Exception;
 
 class MikrotikService
 {
-    protected ?Client $client = null;
+    protected $client;
 
     public function __construct()
     {
-        // Jangan langsung throw di constructor, cukup coba connect,
-        // kalau gagal biarkan $client = null.
-        $this->initClient();
-    }
 
-    protected function initClient(): void
-    {
         try {
             $this->client = new Client([
-                'host'     => env('MIKROTIK_HOST'),
-                'user'     => env('MIKROTIK_USER'),
-                'pass'     => env('MIKROTIK_PASS'),
-                'port'     => (int) env('MIKROTIK_PORT', 8728),
-                'timeout'  => (int) env('MIKROTIK_TIMEOUT', 60),   // <-- naikin timeout
-                'attempts' => (int) env('MIKROTIK_ATTEMPTS', 2),
+                'host' => env('MIKROTIK_HOST'),
+                'user' => env('MIKROTIK_USER'),
+                'pass' => env('MIKROTIK_PASS'),
+                'port' => (int) env('MIKROTIK_PORT', 8728),
+                'timeout' => 60, // Tambahkan timeout biar ga nunggu lama
+                'attempts' => 3, // Coba 1x saja dul
             ]);
         } catch (Exception $e) {
-            Log::error('Gagal inisialisasi MikroTik Client', [
-                'error' => $e->getMessage(),
-                'host'  => env('MIKROTIK_HOST'),
-            ]);
+            // --- EDIT BAGIAN INI UNTUK LIHAT ERROR ASLI ---
+            // Jangan di throw dulu, kita dd (dump and die) biar kelihatan di network tab preview
+            // dd([
+            //     'Pesan Error' => $e->getMessage(),
+            //     'Host' => env('MIKROTIK_HOST'),
+            //     'Port' => env('MIKROTIK_PORT'),
+            // ]);
+            // ----------------------------------------------
+            // Biarkan null jika koneksi gagal, nanti dicek di method
             $this->client = null;
         }
     }
 
-    /**
-     * Pastikan selalu punya client yang "sehat".
-     */
-    protected function getClient(): Client
-    {
-        if (!$this->client) {
-            $this->initClient();
-        }
-
-        if (!$this->client) {
-            throw new Exception('Tidak bisa terhubung ke MikroTik (client null).');
-        }
-
-        return $this->client;
-    }
-
-    public function isConnected(): bool
+    public function isConnected()
     {
         return $this->client !== null;
-    }
-
-    /**
-     * Helper umum untuk call MikroTik dengan retry & reconnect
-     */
-    protected function callWithRetry(string $path, ?callable $builder = null, int $maxRetries = 3)
-    {
-        $attempt = 0;
-        $lastException = null;
-
-        while ($attempt < $maxRetries) {
-            $attempt++;
-
-            try {
-                $client = $this->getClient();
-
-                $query = new Query($path);
-                if ($builder) {
-                    // builder boleh memodifikasi query
-                    $query = $builder($query) ?? $query;
-                }
-
-                $start = microtime(true);
-                $result = $client->query($query)->read();
-                $duration = round(microtime(true) - $start, 3);
-
-                Log::info("MikroTik query sukses", [
-                    'path'    => $path,
-                    'attempt' => $attempt,
-                    'count'   => is_array($result) ? count($result) : null,
-                    'time'    => $duration . 's',
-                ]);
-
-                return $result;
-            } catch (\Throwable $e) {
-                $lastException = $e;
-
-                Log::warning("MikroTik query gagal", [
-                    'path'    => $path,
-                    'attempt' => $attempt,
-                    'error'   => $e->getMessage(),
-                ]);
-
-                // putuskan client biar next attempt re-init
-                $this->client = null;
-
-                // kecilkan delay sendiri kalau mau
-                usleep(300_000); // 0.3 detik
-            }
-        }
-
-        throw new Exception(
-            'Gagal memanggil MikroTik setelah '
-                . $maxRetries
-                . ' percobaan. Error terakhir: '
-                . ($lastException ? $lastException->getMessage() : 'unknown')
-        );
     }
 
     /**
@@ -121,12 +47,13 @@ class MikrotikService
      */
     public function getPppSecrets()
     {
-        // bisa ditambah filter kalau mau (misal hanya service=pppoe)
-        return $this->callWithRetry('/ppp/secret/print', function (Query $q) {
-            // Contoh: kalau mau proplist biar respon lebih kecil dan cepat:
-            // $q->equal('.proplist', 'name,password,profile,local-address,remote-address,last-logged-out,disabled,comment');
-            return $q;
-        });
+        if (!$this->client) {
+            throw new Exception("Gagal terkoneksi ke MikroTik. Cek konfigurasi .env");
+        }
+
+        // Query ke /ppp/secret/print
+        $query = new Query('/ppp/secret/print');
+        return $this->client->query($query)->read();
     }
 
     /**
@@ -134,7 +61,16 @@ class MikrotikService
      */
     public function getActivePppConnections()
     {
-        return $this->callWithRetry('/ppp/active/print');
+        if (!$this->client) {
+            throw new Exception("Koneksi ke MikroTik terputus atau gagal inisialisasi.");
+        }
+
+        $query = new Query('/ppp/active/print');
+
+        // Baca response
+        $result = $this->client->query($query)->read();
+
+        return $result;
     }
 
     /**
@@ -142,7 +78,14 @@ class MikrotikService
      */
     public function getPppProfiles()
     {
-        return $this->callWithRetry('/ppp/profile/print');
+        if (!$this->client) {
+            // Coba reconnect atau throw error
+            throw new Exception("Koneksi MikroTik terputus/belum diinisialisasi.");
+        }
+
+        // Query yang benar untuk ambil profile
+        $query = new Query('/ppp/profile/print');
+        return $this->client->query($query)->read();
     }
 
     /**
@@ -150,13 +93,17 @@ class MikrotikService
      */
     public function createPppSecret($data)
     {
-        return $this->callWithRetry('/ppp/secret/add', function (Query $q) use ($data) {
-            return $q
-                ->equal('name', $data['name'])
-                ->equal('password', $data['password'])
-                ->equal('profile', $data['profile'])
-                ->equal('service', 'pppoe')
-                ->equal('comment', $data['comment'] ?? '');
-        });
+        if (!$this->client) {
+            throw new Exception("Gagal koneksi ke MikroTik");
+        }
+
+        $query = (new Query('/ppp/secret/add'))
+            ->equal('name', $data['name'])
+            ->equal('password', $data['password'])
+            ->equal('profile', $data['profile'])
+            ->equal('service', 'pppoe')
+            ->equal('comment', $data['comment']); // Nama Pelanggan
+
+        return $this->client->query($query)->read();
     }
 }
