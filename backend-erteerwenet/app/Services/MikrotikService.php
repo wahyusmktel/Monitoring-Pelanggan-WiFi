@@ -20,7 +20,7 @@ class MikrotikService
                 'user' => env('MIKROTIK_USER'),
                 'pass' => env('MIKROTIK_PASS'),
                 'port' => (int) env('MIKROTIK_PORT', 8728),
-                'timeout' => 15, // Tambahkan timeout biar ga nunggu lama
+                'timeout' => 60, // Tambahkan timeout biar ga nunggu lama
                 'attempts' => 3, // Coba 1x saja dul
             ]);
         } catch (Exception $e) {
