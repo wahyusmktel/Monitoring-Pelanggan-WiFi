@@ -185,13 +185,38 @@ class MikrotikController extends Controller
                 ->with(['pppoe_account', 'package'])
                 ->get();
 
-            // 2. Ambil Data Live dari MikroTik
-            if (!$this->mikrotik->isConnected()) {
-                return response()->json(['message' => 'Gagal koneksi ke MikroTik'], 500);
+            // 2. Ambil Data Live dari MikroTik dengan RETRY MANUAL
+            $activeConnections = [];
+            $retryCount = 0;
+            $maxRetries = 3;
+            $success = false;
+            $lastError = '';
+
+            while ($retryCount < $maxRetries && !$success) {
+                try {
+                    // Cek koneksi
+                    if (!$this->mikrotik->isConnected()) {
+                        throw new \Exception("Client disconnected");
+                    }
+
+                    // Coba ambil data
+                    $activeConnections = $this->mikrotik->getActivePppConnections();
+                    $success = true; // Berhasil!
+
+                } catch (\Exception $e) {
+                    $retryCount++;
+                    $lastError = $e->getMessage();
+                    // Tunggu 1 detik sebelum coba lagi
+                    sleep(1);
+                }
             }
 
-            // Mengambil data active connection (butuh resource cukup berat jika user ribuan, tapi oke untuk skala menengah)
-            $activeConnections = $this->mikrotik->getActivePppConnections();
+            // Jika setelah 3x percobaan masih gagal, return error 500
+            if (!$success) {
+                return response()->json([
+                    'message' => 'Gagal mengambil data MikroTik setelah ' . $maxRetries . ' percobaan. Error: ' . $lastError
+                ], 500);
+            }
 
             // Ubah array MikroTik menjadi Key-Value biar pencarian cepat (Key: username)
             $activeMap = [];

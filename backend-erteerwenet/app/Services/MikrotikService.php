@@ -4,6 +4,7 @@ namespace App\Services;
 
 use RouterOS\Client;
 use RouterOS\Query;
+use Illuminate\Support\Facades\Log;
 use Exception;
 
 class MikrotikService
@@ -12,23 +13,24 @@ class MikrotikService
 
     public function __construct()
     {
+
         try {
             $this->client = new Client([
                 'host' => env('MIKROTIK_HOST'),
                 'user' => env('MIKROTIK_USER'),
                 'pass' => env('MIKROTIK_PASS'),
                 'port' => (int) env('MIKROTIK_PORT', 8728),
-                'timeout' => 10, // Tambahkan timeout biar ga nunggu lama
-                'attempts' => 1, // Coba 1x saja dul
+                'timeout' => 15, // Tambahkan timeout biar ga nunggu lama
+                'attempts' => 3, // Coba 1x saja dul
             ]);
         } catch (Exception $e) {
             // --- EDIT BAGIAN INI UNTUK LIHAT ERROR ASLI ---
             // Jangan di throw dulu, kita dd (dump and die) biar kelihatan di network tab preview
-            dd([
-                'Pesan Error' => $e->getMessage(),
-                'Host' => env('MIKROTIK_HOST'),
-                'Port' => env('MIKROTIK_PORT'),
-            ]);
+            // dd([
+            //     'Pesan Error' => $e->getMessage(),
+            //     'Host' => env('MIKROTIK_HOST'),
+            //     'Port' => env('MIKROTIK_PORT'),
+            // ]);
             // ----------------------------------------------
             // Biarkan null jika koneksi gagal, nanti dicek di method
             $this->client = null;
@@ -59,10 +61,16 @@ class MikrotikService
      */
     public function getActivePppConnections()
     {
-        if (!$this->client) return [];
+        if (!$this->client) {
+            throw new Exception("Koneksi ke MikroTik terputus atau gagal inisialisasi.");
+        }
 
         $query = new Query('/ppp/active/print');
-        return $this->client->query($query)->read();
+
+        // Baca response
+        $result = $this->client->query($query)->read();
+
+        return $result;
     }
 
     /**
