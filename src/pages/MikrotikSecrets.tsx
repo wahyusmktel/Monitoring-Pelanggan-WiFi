@@ -24,6 +24,7 @@ interface PppoeAccount {
   remote_address: string | null;
   caller_id?: string | null;
   customer_id: number | null;
+  updated_at: string;
   // Relasi dari backend
   customer?: {
     id: number;
@@ -38,6 +39,11 @@ const MikrotikSecrets: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10); // 10 data per halaman
+  const [filterSyncStatus, setFilterSyncStatus] = useState<
+    "all" | "synced" | "unsynced"
+  >("all");
 
   // Modal States
   const [showModal, setShowModal] = useState(false);
@@ -74,7 +80,15 @@ const MikrotikSecrets: React.FC = () => {
 
     try {
       const result = await infrastructureService.syncMikrotikData();
-      toast.success(result.message, { id: toastId });
+
+      // AMBIL TOTAL DARI RESPONSE BACKEND
+      const totalData = result.total || 0;
+
+      // TAMPILKAN ALERT SESUAI REQUEST
+      toast.success(`Berhasil sync ${totalData} data dari router`, {
+        id: toastId,
+      });
+
       fetchData(); // Refresh tampilan setelah sync selesai
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Gagal sinkronisasi", {
@@ -125,13 +139,32 @@ const MikrotikSecrets: React.FC = () => {
     }
   };
 
-  const filteredAccounts = accounts.filter(
-    (acc) =>
+  // --- LOGIKA FILTER ---
+  const filteredAccounts = accounts.filter((acc) => {
+    // 1. Filter Search
+    const matchesSearch =
       acc.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
       acc.profile?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (acc.customer &&
-        acc.customer.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        acc.customer.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    // 2. Filter Status Mapping (Baru)
+    const matchesSync =
+      filterSyncStatus === "all" ||
+      (filterSyncStatus === "synced" && acc.customer) ||
+      (filterSyncStatus === "unsynced" && !acc.customer);
+
+    return matchesSearch && matchesSync;
+  });
+
+  // --- LOGIKA PAGINASI ---
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredAccounts.slice(
+    indexOfFirstItem,
+    indexOfLastItem
   );
+  const totalPages = Math.ceil(filteredAccounts.length / itemsPerPage);
 
   // --- LOGIKA FILTER PELANGGAN ---
   // Filter customer untuk Dropdown
@@ -185,15 +218,31 @@ const MikrotikSecrets: React.FC = () => {
               <Database className="w-5 h-5 mr-2" />
               <span className="font-medium">Total: {accounts.length} Akun</span>
             </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Cari Username, Pelanggan..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 px-3 py-1.5 border border-gray-300 rounded-md text-sm w-72 focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="flex space-x-2">
+              {/* --- DROPDOWN FILTER BARU --- */}
+              <select
+                value={filterSyncStatus}
+                onChange={(e) => {
+                  setFilterSyncStatus(e.target.value as any);
+                  setCurrentPage(1); // Reset ke halaman 1 saat filter berubah
+                }}
+                className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="all">Semua Status</option>
+                <option value="synced">Sudah Terhubung</option>
+                <option value="unsynced">Belum Terhubung</option>
+              </select>
+              {/* ---------------------------- */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Cari Username, Pelanggan..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 px-3 py-1.5 border border-gray-300 rounded-md text-sm w-72 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
           </div>
 
@@ -212,6 +261,9 @@ const MikrotikSecrets: React.FC = () => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Pelanggan
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Terakhir Sync
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                     Aksi
@@ -238,63 +290,130 @@ const MikrotikSecrets: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredAccounts.map((acc) => (
-                    <tr key={acc.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="font-medium text-gray-900">
-                          {acc.username}
-                        </span>
-                        <div className="text-xs text-gray-400 font-mono mt-0.5">
-                          Pass: {acc.password || "****"}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                          {acc.profile}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {acc.remote_address || "-"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {acc.customer ? (
-                          <div className="flex items-center">
-                            <UserCheck className="w-4 h-4 text-green-600 mr-2" />
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">
-                                {acc.customer.name}
+                  currentItems.map(
+                    (
+                      acc // Gunakan currentItems hasil paginasi
+                    ) => (
+                      <tr key={acc.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="font-medium text-gray-900">
+                            {acc.username}
+                          </span>
+                          <div className="text-xs text-gray-400 font-mono mt-0.5">
+                            Pass: {acc.password || "****"}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                            {acc.profile}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {acc.remote_address || "-"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {acc.customer ? (
+                            <div className="flex items-center">
+                              <UserCheck className="w-4 h-4 text-green-600 mr-2" />
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {acc.customer.name}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-xs italic px-2 py-1 rounded border border-dashed border-gray-300">
-                            Belum Terhubung
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => openMappingModal(acc)}
-                          className={`px-3 py-1.5 rounded text-xs flex items-center ml-auto transition-colors ${
-                            acc.customer
-                              ? "text-yellow-700 bg-yellow-100 hover:bg-yellow-200"
-                              : "text-white bg-blue-600 hover:bg-blue-700"
-                          }`}
-                        >
-                          {acc.customer ? (
-                            <Edit className="w-3 h-3 mr-1" />
                           ) : (
-                            <LinkIcon className="w-3 h-3 mr-1" />
+                            <span className="text-gray-400 text-xs italic px-2 py-1 rounded border border-dashed border-gray-300">
+                              Belum Terhubung
+                            </span>
                           )}
-                          {acc.customer ? "Edit" : "Map"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <div className="flex flex-col">
+                            <span className="font-medium text-gray-900">
+                              {new Date(acc.updated_at).toLocaleDateString(
+                                "id-ID",
+                                {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                }
+                              )}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {new Date(acc.updated_at).toLocaleTimeString(
+                                "id-ID",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                }
+                              )}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => openMappingModal(acc)}
+                            className={`px-3 py-1.5 rounded text-xs flex items-center ml-auto transition-colors ${
+                              acc.customer
+                                ? "text-yellow-700 bg-yellow-100 hover:bg-yellow-200"
+                                : "text-white bg-blue-600 hover:bg-blue-700"
+                            }`}
+                          >
+                            {acc.customer ? (
+                              <Edit className="w-3 h-3 mr-1" />
+                            ) : (
+                              <LinkIcon className="w-3 h-3 mr-1" />
+                            )}
+                            {acc.customer ? "Edit" : "Map"}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  )
                 )}
               </tbody>
             </table>
           </div>
+          {/* --- KONTROL PAGINASI --- */}
+          {filteredAccounts.length > 0 && (
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+              <span className="text-sm text-gray-700">
+                Menampilkan{" "}
+                <span className="font-medium">{indexOfFirstItem + 1}</span>{" "}
+                sampai{" "}
+                <span className="font-medium">
+                  {Math.min(indexOfLastItem, filteredAccounts.length)}
+                </span>{" "}
+                dari{" "}
+                <span className="font-medium">{filteredAccounts.length}</span>{" "}
+                data
+              </span>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 hover:bg-white transition-colors"
+                >
+                  Sebelumnya
+                </button>
+                <span className="px-3 py-1 text-sm font-medium text-gray-700">
+                  Hal {currentPage} / {totalPages}
+                </span>
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 hover:bg-white transition-colors"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          )}
+          {/* ------------------------ */}
         </div>
 
         {/* MODAL MAPPING */}

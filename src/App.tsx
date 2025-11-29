@@ -16,6 +16,7 @@ import CustomerChangePassword from "@/pages/portal/CustomerChangePassword";
 import CustomerDashboard from "@/pages/portal/CustomerDashboard";
 import MikrotikSecrets from "@/pages/MikrotikSecrets";
 import CustomerMonitoring from "@/pages/CustomerMonitoring";
+import { Toaster } from 'sonner';
 
 // --- SATPAM ADMIN (Cek 'token') ---
 const AdminRoute = () => {
@@ -32,6 +33,7 @@ const CustomerRoute = () => {
 export default function App() {
   return (
     <Router>
+      <Toaster position="top-right" richColors />
       <Routes>
         {/* Halaman Public (Login) */}
         <Route path="/" element={<Login />} />
