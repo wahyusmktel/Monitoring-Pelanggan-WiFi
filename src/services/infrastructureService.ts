@@ -173,13 +173,24 @@ export const infrastructureService = {
     }
   },
 
-  // --- MIKROTIK SERVICES ---
+  // Get data dari DB Lokal
   getMikrotikSecrets: async (): Promise<any[]> => {
     try {
       const response = await apiClient.get("/infrastructure/mikrotik/secrets");
       return response.data;
     } catch (error) {
-      console.error("Error fetching Mikrotik secrets:", error);
+      console.error("Error fetching local pppoe accounts:", error);
+      throw error;
+    }
+  },
+
+  // Trigger Sync dari MikroTik ke DB
+  syncMikrotikData: async (): Promise<any> => {
+    try {
+      const response = await apiClient.post("/infrastructure/mikrotik/sync");
+      return response.data;
+    } catch (error) {
+      console.error("Error syncing mikrotik:", error);
       throw error;
     }
   },

@@ -77,6 +77,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // Di dalam prefix 'infrastructure'
         Route::get('/mikrotik/secrets', [MikrotikController::class, 'index']);
 
+        // Action Sync
+        Route::post('/mikrotik/sync', [MikrotikController::class, 'sync']);
+
         // Di dalam prefix 'infrastructure'
         Route::post('/mikrotik/map', [MikrotikController::class, 'mapCustomer']);
 

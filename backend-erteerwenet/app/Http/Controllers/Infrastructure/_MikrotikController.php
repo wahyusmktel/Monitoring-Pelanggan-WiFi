@@ -19,122 +19,48 @@ class MikrotikController extends Controller
     }
 
     /**
-     * Tampilkan data dari Database Lokal (Bukan nembak MikroTik langsung)
+     * Ambil daftar Secret untuk ditampilkan di tabel
      */
     public function index()
     {
-        // Ambil data dari database lokal, beserta relasi ke customer
-        $accounts = CustomerPppoeAccount::with('customer')->get();
-
-        return response()->json($accounts);
-    }
-
-    /**
-     * Sinkronisasi Data: MikroTik -> Database Lokal
-     */
-    public function sync(Request $request)
-    {
         try {
-            if (!$this->mikrotik->isConnected()) {
-                return response()->json(['message' => 'Gagal koneksi ke MikroTik'], 500);
-            }
-
-            // 1. Ambil Data dari MikroTik (Secrets & Active)
+            // 1. Ambil Data dari MikroTik
             $secrets = $this->mikrotik->getPppSecrets();
-            $actives = $this->mikrotik->getActivePppConnections();
 
-            // Buat Map Active Connections biar pencarian cepat (Key: username)
-            $activeMap = [];
-            foreach ($actives as $conn) {
-                if (isset($conn['name'])) {
-                    $activeMap[$conn['name']] = $conn;
-                }
-            }
+            // 2. Ambil Data Mapping dari Database (Eager Load Customer)
+            // Kita ambil semua dan jadikan Key-Value pair berdasarkan username biar pencarian cepat
+            $dbAccounts = CustomerPppoeAccount::with('customer')->get()->keyBy('username');
 
-            $syncedCount = 0;
-            $newCount = 0;
+            $data = collect($secrets)->map(function ($secret) use ($dbAccounts) {
+                $name = $secret['name'] ?? 'Unknown';
 
-            foreach ($secrets as $secret) {
-                $name = $secret['name'] ?? null;
-                if (!$name) continue;
+                // Cek apakah ada di database berdasarkan username
+                $account = $dbAccounts->get($name);
 
-                // A. Ambil Data Statis (Dari Secret)
-                // Sanitasi: Ubah '-' jadi null
-                $localAddress = ($secret['local-address'] ?? '-') === '-' ? null : $secret['local-address'];
-                $remoteAddress = ($secret['remote-address'] ?? '-') === '-' ? null : $secret['remote-address'];
-                $callerId = ($secret['caller-id'] ?? '-') === '-' ? null : $secret['caller-id'];
-
-                // B. Ambil Data Dinamis (Dari Active Connection jika ada)
-                $activeData = [];
-                if (isset($activeMap[$name])) {
-                    $userActive = $activeMap[$name];
-
-                    // Prioritaskan data Live untuk Address & Caller ID
-                    if (isset($userActive['address'])) $remoteAddress = $userActive['address'];
-                    if (isset($userActive['caller-id'])) $callerId = $userActive['caller-id'];
-
-                    $activeData = [
-                        'service' => $userActive['service'] ?? 'pppoe',
-                        'uptime' => $userActive['uptime'] ?? null,
-                        'session_id' => $userActive['.id'] ?? null,
-                        'encoding' => $userActive['encoding'] ?? null,
-                        'limit_bytes_in' => $userActive['limit-bytes-in'] ?? '0',
-                        'limit_bytes_out' => $userActive['limit-bytes-out'] ?? '0',
-                        'radius' => $userActive['radius'] ?? 'false',
-                        'last_seen_at' => now(),
-                    ];
-                } else {
-                    // Jika Offline, reset data dinamis agar tidak menyimpan data basi
-                    $activeData = [
-                        'service' => 'pppoe',
-                        'uptime' => null,
-                        'session_id' => null,
-                        'encoding' => null,
-                        'limit_bytes_in' => null, // Atau biarkan nilai terakhir (opsional)
-                        'limit_bytes_out' => null,
-                        'radius' => 'false',
-                        // 'last_seen_at' tidak diupdate biar ketahuan kapan terakhir onlinenya
-                    ];
-                }
-
-                // C. Siapkan Data Final untuk DB
-                $dataToUpdate = array_merge([
+                return [
+                    'id' => $secret['.id'] ?? null,
+                    'name' => $name,
                     'password' => $secret['password'] ?? '',
                     'profile' => $secret['profile'] ?? 'default',
-                    'local_address' => $localAddress,
-                    'remote_address' => $remoteAddress,
-                    'caller_id' => $callerId,
-                ], $activeData);
+                    'local_address' => $secret['local-address'] ?? null,
+                    'remote_address' => $secret['remote-address'] ?? null,
+                    'caller_id' => $secret['caller-id'] ?? null,
+                    'last_logged_out' => $secret['last-logged-out'] ?? '-',
+                    'disabled' => ($secret['disabled'] ?? 'false') === 'true',
 
+                    // PERUBAHAN DISINI: Kirim data pelanggan yang terhubung
+                    'is_synced' => $account ? true : false,
+                    'connected_customer' => $account ? [
+                        'id' => $account->customer->id,
+                        'name' => $account->customer->name,
+                        'number' => $account->customer->customer_number
+                    ] : null
+                ];
+            });
 
-                // --- LOGIKA AUTO-CONNECT (Sama seperti sebelumnya) ---
-                $matchedCustomer = Customer::where('customer_number', $name)->first();
-                $currentAccount = CustomerPppoeAccount::where('username', $name)->first();
-
-                if ($matchedCustomer && (!$currentAccount || is_null($currentAccount->customer_id))) {
-                    $dataToUpdate['customer_id'] = $matchedCustomer->id;
-                }
-                // -----------------------------------------------------
-
-                // D. Eksekusi Simpan ke DB
-                $account = CustomerPppoeAccount::updateOrCreate(
-                    ['username' => $name],
-                    $dataToUpdate
-                );
-
-                if ($account->wasRecentlyCreated) {
-                    $newCount++;
-                } else {
-                    $syncedCount++;
-                }
-            }
-
-            return response()->json([
-                'message' => "Sinkronisasi Selesai. {$newCount} data baru, {$syncedCount} data diperbarui.",
-                'total' => $newCount + $syncedCount
-            ]);
+            return response()->json($data);
         } catch (\Exception $e) {
-            return response()->json(['message' => 'Sync Error: ' . $e->getMessage()], 500);
+            return response()->json(['message' => 'Gagal mengambil data: ' . $e->getMessage()], 500);
         }
     }
 
@@ -190,7 +116,7 @@ class MikrotikController extends Controller
      */
     public function mapCustomer(Request $request)
     {
-        // 1. Sanitasi Data Input
+        // 1. Sanitasi Data Input (dari Secrets)
         $input = $request->all();
         $fieldsToNull = ['local_address', 'remote_address', 'caller_id', 'password', 'profile'];
         foreach ($fieldsToNull as $field) {
@@ -211,45 +137,38 @@ class MikrotikController extends Controller
         ]);
 
         try {
-            // --- LOGIKA CLEANUP: Lepaskan akun lain milik pelanggan ini (Swap Logic) ---
+            // --- PERBAIKAN LOGIKA DISINI (CLEANUP AKUN LAMA) ---
+
+            // 1. Cek apakah Pelanggan ini (ID: X) sudah punya akun PPPoE LAIN sebelumnya?
+            // Misal: Wahyu sudah punya akun 'wahyu', sekarang mau dimap ke 'lusi'.
+            // Maka akun 'wahyu' harus dihapus dulu biar Wahyu cuma punya 'lusi'.
             $oldAccount = CustomerPppoeAccount::where('customer_id', $request->customer_id)
-                ->where('username', '!=', $request->mikrotik_name)
+                ->where('username', '!=', $request->mikrotik_name) // Kecuali akun yang sedang diedit ini sendiri
                 ->first();
 
             if ($oldAccount) {
+                // Hapus akun lama dari database lokal (Unlink)
                 $oldAccount->delete();
+                // Log: Akun lama 'wahyu' dihapus dari pelanggan ID X.
             }
-            // ------------------------------------------------------------
 
-            // 2. Siapkan Data Default (Offline State)
-            $finalRemoteAddress = $request->remote_address;
-            $finalLocalAddress = $request->local_address;
-            $finalCallerId = $request->caller_id;
+            // 2. Cek Validasi Kepemilikan Orang Lain (Opsional, tapi bagus buat keamanan)
+            // Cek apakah akun 'lusi' ini sebelumnya milik orang lain (Dani)?
+            // updateOrCreate di bawah otomatis menghandle ini (Dani akan kehilangan 'lusi'),
+            // jadi tidak perlu error, biarkan saja "direbut".
+            // ---------------------------------------------------
 
-            // Data teknis default (null/kosong jika offline)
-            $technicalData = [
-                'service' => 'pppoe',
-                'uptime' => null,
-                'session_id' => null,
-                'encoding' => null,
-                'limit_bytes_in' => '0',
-                'limit_bytes_out' => '0',
-                'radius' => 'false',
-                'last_seen_at' => now(),
-            ];
 
-            // 3. Cek Koneksi Aktif (Online State) -> Timpa data default dengan data live
+            // ... (Bagian 2. Cek Koneksi Aktif Mikrotik TETAP SAMA) ...
+            $activeData = [];
             if ($this->mikrotik->isConnected()) {
+                // ... logic ambil active connection ...
                 $actives = $this->mikrotik->getActivePppConnections();
                 $userActive = collect($actives)->firstWhere('name', $request->mikrotik_name);
 
                 if ($userActive) {
-                    // Prioritaskan data Live untuk Address & Caller ID
-                    if (isset($userActive['address'])) $finalRemoteAddress = $userActive['address'];
-                    if (isset($userActive['caller-id'])) $finalCallerId = $userActive['caller-id'];
-
-                    // Isi data teknis dari Active Connection
-                    $technicalData = [
+                    // ... mapping data active ...
+                    $activeData = [
                         'service' => $userActive['service'] ?? 'pppoe',
                         'uptime' => $userActive['uptime'] ?? null,
                         'session_id' => $userActive['.id'] ?? null,
@@ -257,37 +176,48 @@ class MikrotikController extends Controller
                         'limit_bytes_in' => $userActive['limit-bytes-in'] ?? '0',
                         'limit_bytes_out' => $userActive['limit-bytes-out'] ?? '0',
                         'radius' => $userActive['radius'] ?? 'false',
+                        'caller_id' => $userActive['caller-id'] ?? $request->caller_id,
+                        'local_address' => $userActive['address'] ?? $request->local_address,
                         'last_seen_at' => now(),
                     ];
                 }
             }
 
-            // 4. Gabungkan Semua Data
+            // ... (Bagian 3. Gabungkan Data TETAP SAMA) ...
             $saveData = array_merge([
-                'customer_id' => $request->customer_id,
-                'username' => $request->mikrotik_name,
+                'customer_id' => $request->customer_id, // Ini akan menimpa pemilik lama jika ada
                 'password' => $request->password,
+                // ... field lainnya ...
                 'profile' => $request->profile,
-                'local_address' => $finalLocalAddress,
-                'remote_address' => $finalRemoteAddress,
-                'caller_id' => $finalCallerId,
-            ], $technicalData); // Merge dengan data teknis
+                'local_address' => $request->local_address,
+                'remote_address' => $request->remote_address,
+                'caller_id' => $request->caller_id,
+                // Default value
+                'service' => 'pppoe',
+                'uptime' => null,
+                'session_id' => null,
+                'encoding' => null,
+                'limit_bytes_in' => null,
+                'limit_bytes_out' => null,
+                'radius' => 'false',
+                'last_seen_at' => $request->last_seen_at ?? now(),
+            ], $activeData);
 
-            // 5. Simpan ke Database (Update jika username ada, Create jika belum)
+            // ... (Bagian 4. Simpan ke Database TETAP SAMA) ...
             CustomerPppoeAccount::updateOrCreate(
-                ['username' => $request->mikrotik_name],
+                ['username' => $request->mikrotik_name], // Cari berdasarkan Username Mikrotik
                 $saveData
             );
 
-            // 6. Update status pelanggan jadi Active
+            // ... (Bagian 5. Update status pelanggan TETAP SAMA) ...
             $customer = Customer::find($request->customer_id);
-            if ($customer && $customer->status == 'pending') {
+            if ($customer->status == 'pending') {
                 $customer->status = 'active';
                 $customer->save();
             }
 
             return response()->json([
-                'message' => "Berhasil menghubungkan {$request->mikrotik_name}. Status: " . (isset($userActive) ? 'ONLINE (Data Live Diupdate)' : 'OFFLINE (Data Secret Disimpan)'),
+                'message' => "Berhasil menghubungkan {$request->mikrotik_name}. Status: " . (!empty($activeData) ? 'ONLINE' : 'OFFLINE'),
             ]);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Gagal mapping: ' . $e->getMessage()], 500);
