@@ -73,6 +73,27 @@ export interface MapLocation {
   details?: Record<string, any>;
 }
 
+export interface CustomerMonitorData {
+  id: number;
+  name: string;
+  customer_number: string;
+  package: string;
+  pppoe_user: string;
+  status: "online" | "offline";
+  ip_address: string;
+  uptime: string;
+  caller_id: string;
+}
+
+export interface MonitorResponse {
+  stats: {
+    total: number;
+    online: number;
+    offline: number;
+  };
+  data: CustomerMonitorData[];
+}
+
 export const infrastructureService = {
   // OLT Services
   getOLTs: async (filters?: InfrastructureFilters): Promise<OLT[]> => {
@@ -149,6 +170,72 @@ export const infrastructureService = {
     } catch (error) {
       console.error(`Error fetching ODC ${id}:`, error);
       throw error;
+    }
+  },
+
+  // --- MIKROTIK SERVICES ---
+  getMikrotikSecrets: async (): Promise<any[]> => {
+    try {
+      const response = await apiClient.get("/infrastructure/mikrotik/secrets");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching Mikrotik secrets:", error);
+      throw error;
+    }
+  },
+
+  // Import satu user dari Mikrotik ke Database
+  importMikrotikUser: async (mikrotikData: any): Promise<any> => {
+    try {
+      // Kita kirim data mikrotik ke endpoint create customer
+      // Backend harus menyesuaikan mapping-nya, atau kita mapping di sini
+      const payload = {
+        name: mikrotikData.name, // Pakai username sebagai nama sementara
+        email: `${mikrotikData.name}@change.me`, // Email dummy
+        phone: "-",
+        address: "Imported from MikroTik",
+        odp_id: 1, // Default ODP (harus ada ID 1 di DB)
+        package_id: 1, // Default Paket (harus ada ID 1 di DB)
+        status: mikrotikData.disabled ? "inactive" : "active",
+        // Kirim username mikrotik sebagai customer_number agar sinkron
+        // Note: Anda mungkin perlu modifikasi CustomerController@store agar menerima customer_number manual
+        // Untuk sekarang kita biarkan auto-generate dulu, nanti diedit manual
+      };
+
+      // Panggil API create customer yang sudah ada
+      const response = await apiClient.post("/customers", payload);
+      return response.data;
+    } catch (error) {
+      console.error("Error importing user:", error);
+      throw error;
+    }
+  },
+
+  // Mapping User Mikrotik ke Existing Customer
+  mapMikrotikUser: async (
+    customerId: number,
+    mikrotikName: string
+  ): Promise<any> => {
+    try {
+      const response = await apiClient.post("/infrastructure/mikrotik/map", {
+        customer_id: customerId,
+        mikrotik_name: mikrotikName,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error mapping user:", error);
+      throw error;
+    }
+  },
+
+  // Ambil list profile PPPoE
+  getMikrotikProfiles: async (): Promise<any[]> => {
+    try {
+      const response = await apiClient.get("/infrastructure/mikrotik/profiles");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching profiles:", error);
+      return [];
     }
   },
 
@@ -259,6 +346,17 @@ export const infrastructureService = {
       return response.data;
     } catch (error) {
       console.error("Error fetching map locations:", error);
+      throw error;
+    }
+  },
+
+  // Monitoring Realtime
+  getFormattedMonitoring: async (): Promise<MonitorResponse> => {
+    try {
+      const response = await apiClient.get("/infrastructure/mikrotik/monitor");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching monitoring data:", error);
       throw error;
     }
   },

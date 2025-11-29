@@ -1,5 +1,5 @@
-import { apiClient } from '.';
-import api from './api';
+import { apiClient } from ".";
+import api from "./api";
 
 export interface Customer {
   id?: number;
@@ -21,6 +21,12 @@ export interface Customer {
   // Optional relations for display
   odp?: { id: number; name: string; location: string };
   package?: { id: number; name: string; speed: string; price: number };
+  // Tambahan Relasi
+  pppoe_account?: {
+    id: number;
+    username: string;
+    profile?: string;
+  } | null;
 }
 
 export interface CustomerCreate {
@@ -30,8 +36,8 @@ export interface CustomerCreate {
   address: string;
   latitude?: number | null;
   longitude?: number | null;
-  odp_id: number;      // Wajib di backend
-  package_id: number;  // Wajib di backend
+  odp_id: number; // Wajib di backend
+  package_id: number; // Wajib di backend
   status?: string;
   installation_date?: string;
   notes?: string | null;
@@ -65,10 +71,12 @@ export const customerService = {
   getCustomers: async (filters?: CustomerFilters): Promise<Customer[]> => {
     try {
       // Backend Laravel kita mengembalikan array langsung untuk index
-      const response = await api.get<Customer[]>('/customers', { params: filters });
+      const response = await api.get<Customer[]>("/customers", {
+        params: filters,
+      });
       return response.data;
     } catch (error) {
-      console.error('Error fetching customers:', error);
+      console.error("Error fetching customers:", error);
       throw error;
     }
   },
@@ -87,50 +95,55 @@ export const customerService = {
   // Import Customer
   importCustomers: async (file: File): Promise<any> => {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
 
     try {
-      const response = await apiClient.post('/customers/import', formData, {
+      const response = await apiClient.post("/customers/import", formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          "Content-Type": "multipart/form-data",
         },
       });
       return response.data;
     } catch (error) {
-      console.error('Error importing customers:', error);
+      console.error("Error importing customers:", error);
       throw error;
     }
   },
-  
+
   // Download Template (Updated: No ODP/Package, Add Lat/Long)
   downloadTemplate: () => {
     // Header CSV baru
     const headers = "name,email,phone,address,latitude,longitude";
     // Contoh data dummy dengan koordinat
-    const example = "Budi Santoso,budi@test.com,0812345678,Jl Merdeka No 1,-6.200000,106.800000";
-    
-    const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + example;
+    const example =
+      "Budi Santoso,budi@test.com,0812345678,Jl Merdeka No 1,-6.200000,106.800000";
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," + headers + "\n" + example;
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
     link.setAttribute("download", "template_pelanggan_v2.csv");
     document.body.appendChild(link);
     link.click();
- },
+  },
 
   // Create new customer
   createCustomer: async (customer: CustomerCreate): Promise<Customer> => {
     try {
-      const response = await api.post<Customer>('/customers', customer);
+      const response = await api.post<Customer>("/customers", customer);
       return response.data;
     } catch (error) {
-      console.error('Error creating customer:', error);
+      console.error("Error creating customer:", error);
       throw error;
     }
   },
 
   // Update customer
-  updateCustomer: async (id: number, customer: CustomerUpdate): Promise<Customer> => {
+  updateCustomer: async (
+    id: number,
+    customer: CustomerUpdate
+  ): Promise<Customer> => {
     try {
       const response = await api.put<Customer>(`/customers/${id}`, customer);
       return response.data;
@@ -153,10 +166,34 @@ export const customerService = {
   // Get customer statistics
   getCustomerStats: async () => {
     try {
-      const response = await api.get('/customers/stats');
+      const response = await api.get("/customers/stats");
       return response.data;
     } catch (error) {
-      console.error('Error fetching customer stats:', error);
+      console.error("Error fetching customer stats:", error);
+      throw error;
+    }
+  },
+
+  // Sync MikroTik
+  syncMikrotik: async (): Promise<any> => {
+    try {
+      const response = await apiClient.post("/infrastructure/mikrotik/sync");
+      return response.data;
+    } catch (error) {
+      console.error("Error syncing MikroTik:", error);
+      throw error;
+    }
+  },
+
+  // Activate Customer & Create PPPoE
+  activateCustomer: async (id: number, pppoeProfile: string): Promise<any> => {
+    try {
+      const response = await apiClient.post(`/customers/${id}/activate`, {
+        pppoe_profile: pppoeProfile,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error activating customer:", error);
       throw error;
     }
   },

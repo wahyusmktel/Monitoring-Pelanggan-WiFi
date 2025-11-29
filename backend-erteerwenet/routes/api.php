@@ -12,6 +12,8 @@ use App\Http\Controllers\Services\PaymentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Services\BillingSettingController;
 use App\Http\Controllers\CustomerPortal\AuthController as CustomerAuthController;
+use App\Http\Controllers\Infrastructure\MikrotikController;
+use App\Services\MikrotikService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -28,6 +30,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    Route::post('/customers/{id}/activate', [CustomerController::class, 'activate']);
+
+    // Route untuk ambil list profile PPPoE (taruh di infrastructure group)
+    Route::get('/infrastructure/mikrotik/profiles', [MikrotikController::class, 'getProfiles']);
 
     // OLT Routes
     Route::prefix('infrastructure')->group(function () {
@@ -63,6 +70,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/monitoring/ports', [PortMonitoringController::class, 'index']);
         // Route Network Map
         Route::get('/map/locations', [NetworkMapController::class, 'index']);
+
+        // Route Sync MikroTik
+        Route::post('/mikrotik/sync', [MikrotikController::class, 'syncCustomers']);
+
+        // Di dalam prefix 'infrastructure'
+        Route::get('/mikrotik/secrets', [MikrotikController::class, 'index']);
+
+        // Di dalam prefix 'infrastructure'
+        Route::post('/mikrotik/map', [MikrotikController::class, 'mapCustomer']);
+
+        // Di dalam prefix 'infrastructure'
+        Route::get('/mikrotik/monitor', [MikrotikController::class, 'monitorCustomers']);
     });
 
     // Services Routes

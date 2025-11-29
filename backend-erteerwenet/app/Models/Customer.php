@@ -60,4 +60,10 @@ class Customer extends Authenticatable
     {
         return $this->hasMany(Payment::class);
     }
+
+    // Relasi ke Akun PPPoE
+    public function pppoe_account()
+    {
+        return $this->hasOne(CustomerPppoeAccount::class);
+    }
 }

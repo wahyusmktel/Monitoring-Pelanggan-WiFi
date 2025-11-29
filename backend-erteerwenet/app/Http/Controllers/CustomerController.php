@@ -5,13 +5,17 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 use App\Imports\CustomersImport;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Services\MikrotikService; // Jangan lupa use ini
+use App\Models\CustomerPppoeAccount; // Dan ini
+use Illuminate\Support\Facades\DB; // Dan ini
+use Illuminate\Support\Facades\Hash; // Dan ini
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Customer::with(['odp', 'package']); // Eager load relasi
+        $query = Customer::with(['odp', 'package', 'pppoe_account']); // Eager load relasi
 
         // 1. Search
         if ($request->has('search') && $request->search != '') {
@@ -66,7 +70,7 @@ class CustomerController extends Controller
 
     public function show($id)
     {
-        return Customer::with(['odp', 'package'])->findOrFail($id);
+        return Customer::with(['odp', 'package', 'pppoe_account'])->findOrFail($id);
     }
 
     public function update(Request $request, $id)
@@ -154,6 +158,76 @@ class CustomerController extends Controller
             return response()->json(['message' => $errorMsg], 422);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Gagal import: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // Method Aktivasi Pelanggan + Create PPPoE
+    public function activate(Request $request, $id, MikrotikService $mikrotik)
+    {
+        $request->validate([
+            'pppoe_profile' => 'required|string',
+        ]);
+
+        $customer = Customer::findOrFail($id);
+
+        // 1. Generate ID Pelanggan (79xxxx)
+        // Cek ID terakhir
+        $latestCustomer = Customer::where('customer_number', 'like', '79%')
+            ->orderBy('customer_number', 'desc')
+            ->first();
+
+        if ($latestCustomer) {
+            $nextId = intval($latestCustomer->customer_number) + 1;
+        } else {
+            $nextId = 790001;
+        }
+        $customerIdString = (string) $nextId;
+
+        DB::beginTransaction(); // Pakai transaksi biar aman
+
+        try {
+            // 2. Create Secret di MikroTik
+            // Cek koneksi dulu
+            if (!$mikrotik->isConnected()) {
+                throw new \Exception("Router MikroTik tidak terhubung!");
+            }
+
+            $mikrotik->createPppSecret([
+                'name' => $customerIdString,       // User = ID Pelanggan
+                'password' => $customerIdString,   // Pass = ID Pelanggan
+                'profile' => $request->pppoe_profile,
+                'comment' => $customer->name . " (App)", // Komentar nama
+            ]);
+
+            // 3. Update Data Pelanggan di DB
+            $customer->customer_number = $customerIdString;
+            $customer->status = 'active';
+            $customer->is_active = true;
+            $customer->installation_date = now();
+            // Password untuk login portal pelanggan (hash)
+            $customer->password = Hash::make($customerIdString);
+            $customer->must_change_password = true;
+            $customer->save();
+
+            // 4. Create Mapping di Tabel customer_pppoe_accounts
+            CustomerPppoeAccount::create([
+                'customer_id' => $customer->id,
+                'username' => $customerIdString,
+                'profile' => $request->pppoe_profile,
+                // Password plain text opsional disimpan atau tidak,
+                // biasanya demi keamanan tidak disimpan di DB lokal, tapi terserah kebijakanmu.
+                // 'password' => $customerIdString
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Pelanggan berhasil diaktivasi & Akun PPPoE dibuat.',
+                'customer' => $customer
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Gagal Aktivasi: ' . $e->getMessage()], 500);
         }
     }
 }

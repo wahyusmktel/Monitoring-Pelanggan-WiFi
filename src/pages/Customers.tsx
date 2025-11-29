@@ -17,6 +17,10 @@ import {
   FileText,
   Download,
   Activity,
+  RefreshCw,
+  Link as LinkIcon,
+  WifiOff,
+  X,
 } from "lucide-react";
 import MapPicker from "@/components/MapPicker";
 import {
@@ -27,6 +31,7 @@ import {
 import { odpService, ODP } from "@/services/odpService";
 import { servicesService, Package } from "@/services/servicesService";
 import { toast } from "sonner";
+import { infrastructureService } from "@/services/infrastructureService";
 
 const Customers: React.FC = () => {
   // State untuk data dari API
@@ -41,6 +46,13 @@ const Customers: React.FC = () => {
   // State untuk form dan UI
   const [showForm, setShowForm] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+  // --- STATE UNTUK AKTIVASI ---
+  const [showActivationModal, setShowActivationModal] = useState(false);
+  const [customerToActivate, setCustomerToActivate] = useState<Customer | null>(
+    null
+  );
+  const [pppoeProfiles, setPppoeProfiles] = useState<any[]>([]);
+  const [selectedProfile, setSelectedProfile] = useState("");
   const [newStatus, setNewStatus] = useState<string>("");
   const [customerToUpdateStatus, setCustomerToUpdateStatus] =
     useState<Customer | null>(null);
@@ -218,6 +230,24 @@ const Customers: React.FC = () => {
     fileInputRef.current?.click();
   };
 
+  // --- FUNGSI SYNC MIKROTIK ---
+  const handleSyncMikrotik = async () => {
+    const toastId = toast.loading("Menghubungkan ke MikroTik...");
+    try {
+      const result = await customerService.syncMikrotik();
+      toast.dismiss(toastId);
+      toast.success(
+        `Sukses! ${result.details.synced_db} data tersinkronisasi.`
+      );
+      fetchData(); // Refresh data
+    } catch (error: any) {
+      toast.dismiss(toastId);
+      toast.error(
+        error.response?.data?.message || "Gagal sinkronisasi MikroTik"
+      );
+    }
+  };
+
   const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -241,30 +271,64 @@ const Customers: React.FC = () => {
     }
   };
 
-  // --- FUNGSI BARU: AKTIVASI PELANGGAN ---
-  const handleActivate = async (customer: Customer) => {
-    if (
-      confirm(
-        `Apakah Anda yakin ingin mengaktifkan pelanggan ${customer.name}?`
-      )
-    ) {
-      try {
-        // Panggil API update status ke 'active'
-        await customerService.updateCustomer(customer.id!, {
-          // Kita kirim object customer yang diperlukan saja atau partial update
-          status: "active",
-          is_active: true,
-        });
+  // --- FUNGSI BUKA MODAL AKTIVASI ---
+  // --- FUNGSI BUKA MODAL AKTIVASI ---
+  const handleActivateClick = async (customer: Customer) => {
+    setCustomerToActivate(customer);
+    // Reset state profile dulu biar ga nyangkut data lama
+    setPppoeProfiles([]);
+    setSelectedProfile("");
 
-        toast.success("Pelanggan berhasil diaktifkan!");
-        fetchData(); // Refresh data
-      } catch (err) {
-        console.error("Error activating customer:", err);
-        toast.error("Gagal mengaktifkan pelanggan");
+    setShowActivationModal(true);
+
+    // Load Profile dari Mikrotik saat modal dibuka
+    const toastId = toast.loading("Memuat profile MikroTik...");
+
+    try {
+      const profiles = await infrastructureService.getMikrotikProfiles();
+      console.log("Data Profile:", profiles); // <--- CEK CONSOLE BROWSER
+
+      if (Array.isArray(profiles) && profiles.length > 0) {
+        setPppoeProfiles(profiles);
+        setSelectedProfile(profiles[0].name); // Default pilih yg pertama
+        toast.success("Profile berhasil dimuat", { id: toastId });
+      } else {
+        toast.error("Tidak ada profile ditemukan di MikroTik", { id: toastId });
       }
+    } catch (e: any) {
+      console.error("Error fetch profile:", e);
+      // Tampilkan pesan error asli dari backend jika ada
+      const msg =
+        e.response?.data?.message || "Gagal memuat profile (Cek Koneksi)";
+      toast.error(msg, { id: toastId });
     }
   };
-  // ---------------------------------------
+
+  // --- FUNGSI PROSES AKTIVASI (SUBMIT) ---
+  const submitActivation = async () => {
+    if (!customerToActivate || !selectedProfile) {
+      toast.error("Pilih profile PPPoE terlebih dahulu");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await customerService.activateCustomer(
+        customerToActivate.id!,
+        selectedProfile
+      );
+      toast.success(`Sukses! ${customerToActivate.name} aktif & PPPoE dibuat.`);
+
+      setShowActivationModal(false);
+      setCustomerToActivate(null);
+      fetchData(); // Refresh tabel
+    } catch (error: any) {
+      const msg = error.response?.data?.message || "Gagal melakukan aktivasi";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   // --- FUNGSI UBAH STATUS (SUSPEND/INACTIVE/ACTIVE) ---
   const openStatusModal = (customer: Customer) => {
@@ -409,6 +473,15 @@ const Customers: React.FC = () => {
           >
             <FileText className="w-4 h-4 mr-2" />
             Import Excel
+          </button>
+          {/* --- TOMBOL SYNC MIKROTIK --- */}
+          <button
+            onClick={handleSyncMikrotik}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+            title="Ambil data PPP Secret dari Router"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Sync MikroTik
           </button>
           <button
             onClick={() => setShowForm(true)}
@@ -586,6 +659,33 @@ const Customers: React.FC = () => {
                       : packages.find((p) => p.id === customer.package_id)
                           ?.name || "Tidak diketahui"}
                   </span>
+                  {/* --- STATUS PPPOE BARU --- */}
+                  <div className="flex items-center text-sm mt-1">
+                    {customer.pppoe_account ? (
+                      <>
+                        <div className="w-4 h-4 flex items-center justify-center mr-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        </div>
+                        <span className="font-medium text-gray-700">
+                          PPPoE:
+                        </span>
+                        <span className="ml-1 text-green-700 font-mono text-xs bg-green-50 px-1.5 py-0.5 rounded border border-green-200">
+                          {customer.pppoe_account.username}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <WifiOff className="w-4 h-4 mr-2 text-gray-400" />
+                        <span className="font-medium text-gray-500">
+                          PPPoE:
+                        </span>
+                        <span className="ml-1 text-gray-400 italic text-xs">
+                          Belum Terhubung
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {/* ------------------------- */}
                 </div>
                 <p className="text-sm text-gray-600">
                   <span className="font-medium">Telepon:</span> {customer.phone}
@@ -625,7 +725,7 @@ const Customers: React.FC = () => {
                   {/* --- TOMBOL AKTIVASI BARU --- */}
                   {customer.status !== "active" && (
                     <button
-                      onClick={() => handleActivate(customer)}
+                      onClick={() => handleActivateClick(customer)}
                       className="bg-green-500 text-white p-2 rounded hover:bg-green-600 transition-colors"
                       title="Aktivasi Pelanggan"
                     >
@@ -989,6 +1089,92 @@ const Customers: React.FC = () => {
           </div>
         )}
       </div>
+      {/* --- MODAL AKTIVASI PELANGGAN --- */}
+      {showActivationModal && customerToActivate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
+            <div className="flex justify-between items-center mb-4 border-b pb-2">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center">
+                <Power className="w-5 h-5 mr-2 text-green-600" />
+                Aktivasi Pelanggan
+              </h3>
+              <button
+                onClick={() => setShowActivationModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <p className="text-sm text-blue-800 font-medium">
+                  Data yang akan dibuat otomatis:
+                </p>
+                <ul className="text-sm text-blue-700 mt-2 list-disc list-inside">
+                  <li>
+                    Status Pelanggan: <b>Active</b>
+                  </li>
+                  <li>
+                    ID Pelanggan: <b>Auto (79xxxx)</b>
+                  </li>
+                  <li>
+                    User PPPoE: <b>(Sama dengan ID)</b>
+                  </li>
+                  <li>
+                    Pass PPPoE: <b>(Sama dengan ID)</b>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pilih Profile PPPoE (MikroTik)
+                </label>
+                {pppoeProfiles.length > 0 ? (
+                  <select
+                    value={selectedProfile}
+                    onChange={(e) => setSelectedProfile(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    {pppoeProfiles.map((prof: any) => (
+                      <option key={prof[".id"]} value={prof.name}>
+                        {prof.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-sm text-red-500">
+                    Gagal memuat profile atau kosong.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setShowActivationModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                disabled={submitting}
+              >
+                Batal
+              </button>
+              <button
+                onClick={submitActivation}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center"
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                ) : (
+                  <Power className="w-4 h-4 mr-2" />
+                )}
+                Proses Aktivasi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

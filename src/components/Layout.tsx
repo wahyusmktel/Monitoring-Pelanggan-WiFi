@@ -1,12 +1,12 @@
-import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { 
-  Home, 
-  Users, 
-  Package, 
-  DollarSign, 
-  Settings, 
+import React from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import axios from "axios";
+import {
+  Home,
+  Users,
+  Package,
+  DollarSign,
+  Settings,
   LogOut,
   Menu,
   X,
@@ -15,8 +15,9 @@ import {
   MapPin,
   Box,
   Activity,
-  Map
-} from 'lucide-react';
+  Map,
+  MonitorPlay,
+} from "lucide-react";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -29,12 +30,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [serverMenuOpen, setServerMenuOpen] = React.useState(false);
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'Pelanggan', href: '/customers', icon: Users },
-    { name: 'Peta Infrastruktur', href: '/network-map', icon: Map },
-    { name: 'Langganan', href: '/subscriptions', icon: Package },
-    { name: 'Pembayaran', href: '/payments', icon: DollarSign },
-    { name: 'Pengaturan', href: '/settings', icon: Settings },
+    { name: "Dashboard", href: "/dashboard", icon: Home },
+    { name: "Pelanggan", href: "/customers", icon: Users },
+    { name: "Peta Infrastruktur", href: "/network-map", icon: Map },
+    { name: "Langganan", href: "/subscriptions", icon: Package },
+    { name: "Pembayaran", href: "/payments", icon: DollarSign },
+    { name: "Pengaturan", href: "/settings", icon: Settings },
   ];
 
   // Tambahkan state untuk payment menu
@@ -47,29 +48,36 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   // --- FUNGSI LOGOUT ---
   const handleLogout = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+      const token = localStorage.getItem("token");
+      const apiUrl =
+        import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
 
       if (token) {
-        await axios.post(`${apiUrl}/logout`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await axios.post(
+          `${apiUrl}/logout`,
+          {},
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
       }
     } catch (error) {
       console.error("Logout failed on server", error);
     } finally {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      navigate('/');
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      navigate("/");
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      } lg:translate-x-0 lg:static lg:inset-0`}>
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } lg:translate-x-0 lg:static lg:inset-0`}
+      >
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
           <h1 className="text-xl font-bold text-blue-600">Internet Manager</h1>
           <button
@@ -79,7 +87,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <X className="h-5 w-5" />
           </button>
         </div>
-        
+
         <nav className="mt-6 px-3">
           {navigation.slice(0, 3).map((item) => {
             const Icon = item.icon;
@@ -89,8 +97,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 to={item.href}
                 className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg mb-1 transition-colors duration-200 ${
                   isActive(item.href)
-                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
                 <Icon className="mr-3 h-5 w-5" />
@@ -104,9 +112,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <button
               onClick={() => setPaymentMenuOpen(!paymentMenuOpen)}
               className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                paymentMenuOpen || isActive('/payments') || isActive('/payment-monitoring')
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                paymentMenuOpen ||
+                isActive("/payments") ||
+                isActive("/payment-monitoring")
+                  ? "bg-blue-50 text-blue-700"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               }`}
             >
               <div className="flex items-center">
@@ -115,24 +125,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
               <svg
                 className={`h-4 w-4 transform transition-transform duration-200 ${
-                  paymentMenuOpen ? 'rotate-180' : ''
+                  paymentMenuOpen ? "rotate-180" : ""
                 }`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </button>
-            
+
             {paymentMenuOpen && (
               <div className="ml-4 mt-1 space-y-1">
                 <Link
                   to="/payments"
                   className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                    isActive('/payments')
-                      ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-700'
-                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                    isActive("/payments")
+                      ? "bg-blue-100 text-blue-700 border-r-2 border-blue-700"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
                   }`}
                 >
                   <DollarSign className="mr-2 h-4 w-4" />
@@ -141,9 +156,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <Link
                   to="/payment-monitoring"
                   className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                    isActive('/payment-monitoring')
-                      ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-700'
-                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                    isActive("/payment-monitoring")
+                      ? "bg-blue-100 text-blue-700 border-r-2 border-blue-700"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
                   }`}
                 >
                   <Activity className="mr-2 h-4 w-4" />
@@ -152,15 +167,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             )}
           </div>
-          
+
           {/* Server Menu with Dropdown */}
           <div className="mb-1">
             <button
               onClick={() => setServerMenuOpen(!serverMenuOpen)}
               className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                serverMenuOpen || isActive('/olt') || isActive('/odc') || isActive('/odp') || isActive('/port-monitoring')
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                serverMenuOpen ||
+                isActive("/olt") ||
+                isActive("/odc") ||
+                isActive("/odp") ||
+                isActive("/port-monitoring")
+                  ? "bg-blue-50 text-blue-700"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               }`}
             >
               <div className="flex items-center">
@@ -169,24 +188,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
               <svg
                 className={`h-4 w-4 transform transition-transform duration-200 ${
-                  serverMenuOpen ? 'rotate-180' : ''
+                  serverMenuOpen ? "rotate-180" : ""
                 }`}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
               </svg>
             </button>
-            
+
             {serverMenuOpen && (
               <div className="ml-4 mt-1 space-y-1">
                 <Link
                   to="/olt"
                   className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                    isActive('/olt')
-                      ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-700'
-                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                    isActive("/olt")
+                      ? "bg-blue-100 text-blue-700 border-r-2 border-blue-700"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
                   }`}
                 >
                   <Network className="mr-2 h-4 w-4" />
@@ -195,9 +219,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <Link
                   to="/odc"
                   className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                    isActive('/odc')
-                      ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-700'
-                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                    isActive("/odc")
+                      ? "bg-blue-100 text-blue-700 border-r-2 border-blue-700"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
                   }`}
                 >
                   <MapPin className="mr-2 h-4 w-4" />
@@ -206,9 +230,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <Link
                   to="/odp"
                   className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                    isActive('/odp')
-                      ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-700'
-                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                    isActive("/odp")
+                      ? "bg-blue-100 text-blue-700 border-r-2 border-blue-700"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
                   }`}
                 >
                   <Box className="mr-2 h-4 w-4" />
@@ -217,34 +241,59 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <Link
                   to="/port-monitoring"
                   className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-                    isActive('/port-monitoring')
-                      ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-700'
-                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                    isActive("/port-monitoring")
+                      ? "bg-blue-100 text-blue-700 border-r-2 border-blue-700"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
                   }`}
                 >
                   <Activity className="mr-2 h-4 w-4" />
                   Monitoring Port
                 </Link>
+                <Link
+                  to="/mikrotik/secrets"
+                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                    isActive("/mikrotik/secrets")
+                      ? "bg-blue-100 text-blue-700 border-r-2 border-blue-700"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                  }`}
+                >
+                  <Server className="mr-2 h-4 w-4" /> {/* Bisa ganti icon */}
+                  Data PPPoE
+                </Link>
+                <Link
+                  to="/customer-monitoring"
+                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                    isActive("/customer-monitoring")
+                      ? "bg-blue-100 text-blue-700 border-r-2 border-blue-700"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                  }`}
+                >
+                  <MonitorPlay className="mr-2 h-4 w-4" />
+                  Status Online
+                </Link>
               </div>
             )}
           </div>
-          
+
           {/* Settings Menu */}
           <Link
             to="/settings"
             className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg mb-1 transition-colors duration-200 ${
-              isActive('/settings')
-                ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              isActive("/settings")
+                ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
             }`}
           >
             <Settings className="mr-3 h-5 w-5" />
             Pengaturan
           </Link>
         </nav>
-        
+
         <div className="absolute bottom-0 w-full px-3 py-4 border-t border-gray-200">
-          <button onClick={handleLogout} className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg w-full transition-colors duration-200">
+          <button
+            onClick={handleLogout}
+            className="flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-lg w-full transition-colors duration-200"
+          >
             <LogOut className="mr-3 h-5 w-5" />
             Keluar
           </button>
@@ -262,13 +311,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             >
               <Menu className="h-6 w-6" />
             </button>
-            
+
             <div className="flex items-center">
               <h2 className="text-lg font-semibold text-gray-900">
-                {navigation.find(item => isActive(item.href))?.name || 'Dashboard'}
+                {navigation.find((item) => isActive(item.href))?.name ||
+                  "Dashboard"}
               </h2>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">Admin</span>
               <div className="h-8 w-8 bg-blue-600 rounded-full flex items-center justify-center">
@@ -279,14 +329,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1">
-          {children}
-        </main>
+        <main className="flex-1">{children}</main>
       </div>
 
       {/* Overlay for mobile */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />

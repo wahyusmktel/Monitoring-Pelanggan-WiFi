@@ -14,6 +14,8 @@ import NetworkMapPage from "@/pages/NetworkMapPage";
 import CustomerLogin from "@/pages/portal/CustomerLogin";
 import CustomerChangePassword from "@/pages/portal/CustomerChangePassword";
 import CustomerDashboard from "@/pages/portal/CustomerDashboard";
+import MikrotikSecrets from "@/pages/MikrotikSecrets";
+import CustomerMonitoring from "@/pages/CustomerMonitoring";
 
 // --- SATPAM ADMIN (Cek 'token') ---
 const AdminRoute = () => {
@@ -47,6 +49,8 @@ export default function App() {
           <Route path="/network-map" element={<NetworkMapPage />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/other" element={<div className="text-center text-xl">Other Page - Coming Soon</div>} />
+          <Route path="/mikrotik/secrets" element={<MikrotikSecrets />} />
+          <Route path="/customer-monitoring" element={<CustomerMonitoring />} />
         </Route>
         {/* --- AREA PELANGGAN (PORTAL) --- */}
         <Route path="/portal/login" element={<CustomerLogin />} />
