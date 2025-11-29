@@ -190,16 +190,23 @@ class MikrotikController extends Controller
                 return response()->json(['message' => 'Gagal koneksi ke MikroTik'], 500);
             }
 
+            // Mengambil data active connection (butuh resource cukup berat jika user ribuan, tapi oke untuk skala menengah)
             $activeConnections = $this->mikrotik->getActivePppConnections();
 
             // Ubah array MikroTik menjadi Key-Value biar pencarian cepat (Key: username)
             $activeMap = [];
             foreach ($activeConnections as $conn) {
-                $activeMap[$conn['name']] = $conn;
+                // Pastikan key 'name' ada (username pppoe)
+                if (isset($conn['name'])) {
+                    $activeMap[$conn['name']] = $conn;
+                }
             }
 
             // 3. Gabungkan Data
             $monitoringData = $customers->map(function ($customer) use ($activeMap) {
+                // Safety check jika relasi pppoe_account null (walaupun sudah di filter whereHas)
+                if (!$customer->pppoe_account) return null;
+
                 $username = $customer->pppoe_account->username;
                 $isOnline = isset($activeMap[$username]);
                 $activeData = $isOnline ? $activeMap[$username] : null;
@@ -211,11 +218,14 @@ class MikrotikController extends Controller
                     'package' => $customer->package ? $customer->package->name : '-',
                     'pppoe_user' => $username,
                     'status' => $isOnline ? 'online' : 'offline',
+                    // Data teknis dari MikroTik
                     'ip_address' => $activeData['address'] ?? '-',
                     'uptime' => $activeData['uptime'] ?? '-',
-                    'caller_id' => $activeData['caller-id'] ?? '-', // MAC Address biasanya
+                    'caller_id' => $activeData['caller-id'] ?? '-', // MAC Address
                 ];
-            });
+            })
+                ->filter() // Hapus data null jika ada error relasi
+                ->values(); // Reset index array JSON
 
             // Hitung Statistik
             $stats = [
