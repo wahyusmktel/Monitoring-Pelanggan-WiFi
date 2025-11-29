@@ -214,12 +214,18 @@ export const infrastructureService = {
   // Mapping User Mikrotik ke Existing Customer
   mapMikrotikUser: async (
     customerId: number,
-    mikrotikName: string
+    secretData: any
   ): Promise<any> => {
     try {
       const response = await apiClient.post("/infrastructure/mikrotik/map", {
         customer_id: customerId,
-        mikrotik_name: mikrotikName,
+        mikrotik_name: secretData.name,
+        // Kirim data detail
+        password: secretData.password,
+        profile: secretData.profile,
+        local_address: secretData.local_address,
+        remote_address: secretData.remote_address,
+        caller_id: secretData.caller_id,
       });
       return response.data;
     } catch (error) {

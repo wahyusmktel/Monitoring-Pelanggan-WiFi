@@ -15,7 +15,17 @@ class CustomerPppoeAccount extends Model
         'password',
         'profile',
         'local_address',
-        'remote_address'
+        'remote_address',
+        'caller_id',
+        // Field Baru
+        'service',
+        'uptime',
+        'session_id',
+        'encoding',
+        'limit_bytes_in',
+        'limit_bytes_out',
+        'radius',
+        'last_seen_at'
     ];
 
     public function customer()

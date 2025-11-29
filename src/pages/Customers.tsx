@@ -21,6 +21,7 @@ import {
   Link as LinkIcon,
   WifiOff,
   X,
+  Fingerprint,
 } from "lucide-react";
 import MapPicker from "@/components/MapPicker";
 import {
@@ -694,6 +695,16 @@ const Customers: React.FC = () => {
                   <span className="font-medium">Alamat:</span>{" "}
                   {customer.address}
                 </p>
+                {/* --- TAMBAHAN: MAC ADDRESS --- */}
+                {customer.pppoe_account?.caller_id && (
+                  <div className="flex items-center text-xs text-gray-500 mt-1 ml-0.5">
+                    <Fingerprint className="w-3 h-3 mr-1.5 text-purple-500" />
+                    <span className="font-mono bg-gray-100 px-1.5 rounded border border-gray-200">
+                      {customer.pppoe_account.caller_id}
+                    </span>
+                  </div>
+                )}
+                {/* ----------------------------- */}
               </div>
 
               <div className="flex justify-between items-center">

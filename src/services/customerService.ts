@@ -26,6 +26,7 @@ export interface Customer {
     id: number;
     username: string;
     profile?: string;
+    caller_id?: string;
   } | null;
 }
 
