@@ -22,6 +22,8 @@ return [
     'allowed_origins' => [
         'http://localhost:5173',
         'http://127.0.0.1:5173',
+        'http://11.217.55.4',
+        'https://tim7.smktelkom-lpg.id',
     ],
 
     'allowed_origins_patterns' => [],
