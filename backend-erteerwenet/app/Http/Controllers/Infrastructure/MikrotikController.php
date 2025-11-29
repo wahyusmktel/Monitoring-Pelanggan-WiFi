@@ -327,84 +327,136 @@ class MikrotikController extends Controller
         }
     }
 
+    // /**
+    //  * Monitoring Status Online/Offline Pelanggan
+    //  */
+    // public function monitorCustomers()
+    // {
+    //     try {
+    //         // 1. Ambil Pelanggan Aktif yang punya akun PPPoE
+    //         $customers = Customer::where('status', 'active')
+    //             ->whereHas('pppoe_account')
+    //             ->with(['pppoe_account', 'package'])
+    //             ->get();
+
+    //         // 2. Ambil Data Live dari MikroTik dengan RETRY MANUAL
+    //         $activeConnections = [];
+    //         $retryCount = 0;
+    //         $maxRetries = 3;
+    //         $success = false;
+    //         $lastError = '';
+
+    //         while ($retryCount < $maxRetries && !$success) {
+    //             try {
+    //                 // Cek koneksi
+    //                 if (!$this->mikrotik->isConnected()) {
+    //                     throw new \Exception("Client disconnected");
+    //                 }
+
+    //                 // Coba ambil data
+    //                 $activeConnections = $this->mikrotik->getActivePppConnections();
+    //                 $success = true; // Berhasil!
+
+    //             } catch (\Exception $e) {
+    //                 $retryCount++;
+    //                 $lastError = $e->getMessage();
+    //                 // Tunggu 1 detik sebelum coba lagi
+    //                 sleep(1);
+    //             }
+    //         }
+
+    //         // Jika setelah 3x percobaan masih gagal, return error 500
+    //         if (!$success) {
+    //             return response()->json([
+    //                 'message' => 'Gagal mengambil data MikroTik setelah ' . $maxRetries . ' percobaan. Error: ' . $lastError
+    //             ], 500);
+    //         }
+
+    //         // Ubah array MikroTik menjadi Key-Value biar pencarian cepat (Key: username)
+    //         $activeMap = [];
+    //         foreach ($activeConnections as $conn) {
+    //             // Pastikan key 'name' ada (username pppoe)
+    //             if (isset($conn['name'])) {
+    //                 $activeMap[$conn['name']] = $conn;
+    //             }
+    //         }
+
+    //         // 3. Gabungkan Data
+    //         $monitoringData = $customers->map(function ($customer) use ($activeMap) {
+    //             // Safety check jika relasi pppoe_account null (walaupun sudah di filter whereHas)
+    //             if (!$customer->pppoe_account) return null;
+
+    //             $username = $customer->pppoe_account->username;
+    //             $isOnline = isset($activeMap[$username]);
+    //             $activeData = $isOnline ? $activeMap[$username] : null;
+
+    //             return [
+    //                 'id' => $customer->id,
+    //                 'name' => $customer->name,
+    //                 'customer_number' => $customer->customer_number,
+    //                 'package' => $customer->package ? $customer->package->name : '-',
+    //                 'pppoe_user' => $username,
+    //                 'status' => $isOnline ? 'online' : 'offline',
+    //                 // Data teknis dari MikroTik
+    //                 'ip_address' => $activeData['address'] ?? '-',
+    //                 'uptime' => $activeData['uptime'] ?? '-',
+    //                 'caller_id' => $activeData['caller-id'] ?? '-', // MAC Address
+    //             ];
+    //         })
+    //             ->filter() // Hapus data null jika ada error relasi
+    //             ->values(); // Reset index array JSON
+
+    //         // Hitung Statistik
+    //         $stats = [
+    //             'total' => $monitoringData->count(),
+    //             'online' => $monitoringData->where('status', 'online')->count(),
+    //             'offline' => $monitoringData->where('status', 'offline')->count(),
+    //         ];
+
+    //         return response()->json([
+    //             'stats' => $stats,
+    //             'data' => $monitoringData
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         return response()->json(['message' => 'Error monitoring: ' . $e->getMessage()], 500);
+    //     }
+    // }
+
     /**
-     * Monitoring Status Online/Offline Pelanggan
+     * Tampilkan Data Monitoring dari Database Lokal
      */
     public function monitorCustomers()
     {
         try {
-            // 1. Ambil Pelanggan Aktif yang punya akun PPPoE
+            // Ambil Pelanggan Aktif yang punya akun PPPoE
             $customers = Customer::where('status', 'active')
                 ->whereHas('pppoe_account')
                 ->with(['pppoe_account', 'package'])
                 ->get();
 
-            // 2. Ambil Data Live dari MikroTik dengan RETRY MANUAL
-            $activeConnections = [];
-            $retryCount = 0;
-            $maxRetries = 3;
-            $success = false;
-            $lastError = '';
-
-            while ($retryCount < $maxRetries && !$success) {
-                try {
-                    // Cek koneksi
-                    if (!$this->mikrotik->isConnected()) {
-                        throw new \Exception("Client disconnected");
-                    }
-
-                    // Coba ambil data
-                    $activeConnections = $this->mikrotik->getActivePppConnections();
-                    $success = true; // Berhasil!
-
-                } catch (\Exception $e) {
-                    $retryCount++;
-                    $lastError = $e->getMessage();
-                    // Tunggu 1 detik sebelum coba lagi
-                    sleep(1);
-                }
-            }
-
-            // Jika setelah 3x percobaan masih gagal, return error 500
-            if (!$success) {
-                return response()->json([
-                    'message' => 'Gagal mengambil data MikroTik setelah ' . $maxRetries . ' percobaan. Error: ' . $lastError
-                ], 500);
-            }
-
-            // Ubah array MikroTik menjadi Key-Value biar pencarian cepat (Key: username)
-            $activeMap = [];
-            foreach ($activeConnections as $conn) {
-                // Pastikan key 'name' ada (username pppoe)
-                if (isset($conn['name'])) {
-                    $activeMap[$conn['name']] = $conn;
-                }
-            }
-
-            // 3. Gabungkan Data
-            $monitoringData = $customers->map(function ($customer) use ($activeMap) {
-                // Safety check jika relasi pppoe_account null (walaupun sudah di filter whereHas)
+            $monitoringData = $customers->map(function ($customer) {
                 if (!$customer->pppoe_account) return null;
 
-                $username = $customer->pppoe_account->username;
-                $isOnline = isset($activeMap[$username]);
-                $activeData = $isOnline ? $activeMap[$username] : null;
+                $account = $customer->pppoe_account;
+
+                // Logika Status: Jika 'uptime' atau 'session_id' ada isinya, berarti Online
+                $isOnline = !empty($account->session_id) && !empty($account->uptime);
 
                 return [
                     'id' => $customer->id,
                     'name' => $customer->name,
                     'customer_number' => $customer->customer_number,
                     'package' => $customer->package ? $customer->package->name : '-',
-                    'pppoe_user' => $username,
+                    'pppoe_user' => $account->username,
                     'status' => $isOnline ? 'online' : 'offline',
-                    // Data teknis dari MikroTik
-                    'ip_address' => $activeData['address'] ?? '-',
-                    'uptime' => $activeData['uptime'] ?? '-',
-                    'caller_id' => $activeData['caller-id'] ?? '-', // MAC Address
+                    'ip_address' => $account->remote_address ?? '-',
+                    'uptime' => $account->uptime ?? '-',
+                    'caller_id' => $account->caller_id ?? '-',
+                    'last_seen' => $account->last_seen_at, // Opsional: info kapan terakhir online
                 ];
             })
-                ->filter() // Hapus data null jika ada error relasi
-                ->values(); // Reset index array JSON
+                ->filter()
+                ->values();
 
             // Hitung Statistik
             $stats = [
@@ -419,6 +471,62 @@ class MikrotikController extends Controller
             ]);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Error monitoring: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Sync Data Active Connection (Update Status Online/Offline)
+     */
+    public function syncActive()
+    {
+        try {
+            if (!$this->mikrotik->isConnected()) {
+                return response()->json(['message' => 'Gagal koneksi ke MikroTik'], 500);
+            }
+
+            // 1. Ambil Data Aktif dari MikroTik
+            $actives = $this->mikrotik->getActivePppConnections();
+            $activeUsernames = [];
+
+            // 2. Update Akun yang sedang ONLINE
+            foreach ($actives as $active) {
+                $username = $active['name'] ?? null;
+                if (!$username) continue;
+
+                $activeUsernames[] = $username; // Simpan username yang online
+
+                // Update data realtime ke database
+                CustomerPppoeAccount::where('username', $username)->update([
+                    'service' => $active['service'] ?? 'pppoe',
+                    'uptime' => $active['uptime'] ?? null,
+                    'session_id' => $active['.id'] ?? null,
+                    'encoding' => $active['encoding'] ?? null,
+                    'limit_bytes_in' => $active['limit-bytes-in'] ?? '0',
+                    'limit_bytes_out' => $active['limit-bytes-out'] ?? '0',
+                    'radius' => $active['radius'] ?? 'false',
+                    'caller_id' => $active['caller-id'] ?? null,
+                    'remote_address' => $active['address'] ?? null, // IP Client
+                    'last_seen_at' => now(),
+                ]);
+            }
+
+            // 3. Update Akun yang OFFLINE (Reset session data)
+            // Semua akun di database yang username-nya TIDAK ADA di daftar $activeUsernames
+            // berarti sedang Offline. Kita reset data sesinya.
+            CustomerPppoeAccount::whereNotIn('username', $activeUsernames)->update([
+                'uptime' => null,
+                'session_id' => null,
+                'encoding' => null,
+                // 'caller_id' => null, // Opsional: Jangan hapus caller_id biar ada history
+                // 'remote_address' => null, // Opsional: Jangan hapus IP biar ada history
+            ]);
+
+            return response()->json([
+                'message' => 'Sinkronisasi status koneksi berhasil.',
+                'online_count' => count($activeUsernames)
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Sync Error: ' . $e->getMessage()], 500);
         }
     }
 }

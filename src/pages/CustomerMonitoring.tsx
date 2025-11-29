@@ -9,6 +9,8 @@ import {
   Search,
   User,
   MonitorPlay,
+  Database,
+  Loader2,
 } from "lucide-react";
 import {
   infrastructureService,
@@ -19,58 +21,85 @@ import { toast } from "sonner";
 const CustomerMonitoring: React.FC = () => {
   const [data, setData] = useState<CustomerMonitorData[]>([]);
   const [stats, setStats] = useState({ total: 0, online: 0, offline: 0 });
-  const [loading, setLoading] = useState(true);
+
+  // Loading states
+  const [loadingData, setLoadingData] = useState(true); // Loading saat fetch DB
+  const [syncing, setSyncing] = useState(false); // Loading saat Sync ke Router
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<
     "all" | "online" | "offline"
   >("all");
 
+  // 1. Fetch Data dari Database Lokal
   const fetchData = async () => {
-    setLoading(true);
+    setLoadingData(true);
     try {
       const result = await infrastructureService.getFormattedMonitoring();
       setData(result.data);
       setStats(result.stats);
-      toast.success("Data status koneksi diperbarui");
     } catch (error) {
-      toast.error("Gagal mengambil data dari MikroTik");
+      toast.error("Gagal mengambil data database");
     } finally {
-      setLoading(false);
+      setLoadingData(false);
     }
   };
 
-  // --- HELPER: FORMAT UPTIME MIKROTIK ---
-  const formatUptime = (uptime: string) => {
-    if (!uptime || uptime === "-" || uptime === "") return "-";
-
-    // Regex untuk memecah string (misal: 4d5h -> ["4d", "5h"])
-    const parts = uptime.match(/(\d+[wdhms])/g);
-
-    if (!parts) return uptime; // Kembalikan aslinya jika format tidak dikenali
-
-    const unitMap: { [key: string]: string } = {
-      w: "Minggu",
-      d: "Hari",
-      h: "Jam",
-      m: "Menit",
-      s: "Detik",
-    };
-
-    return parts
-      .map((part) => {
-        const unit = part.slice(-1); // Ambil huruf terakhir (w/d/h/m/s)
-        const value = part.slice(0, -1); // Ambil angkanya
-        return `${value} ${unitMap[unit] || unit}`;
-      })
-      .join(" ");
+  // 2. Sync Data dari Router MikroTik
+  const handleSync = async () => {
+    setSyncing(true);
+    const toastId = toast.loading("Sinkronisasi status koneksi...");
+    try {
+      const result = await infrastructureService.syncActiveConnections();
+      toast.success(`Sync Selesai. ${result.online_count} user online.`, {
+        id: toastId,
+      });
+      fetchData(); // Refresh tampilan setelah sync
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Gagal sinkronisasi router",
+        { id: toastId }
+      );
+    } finally {
+      setSyncing(false);
+    }
   };
 
   useEffect(() => {
     fetchData();
-    // Auto refresh setiap 60 detik (opsional)
-    const interval = setInterval(fetchData, 60000);
-    return () => clearInterval(interval);
+    // Auto refresh tampilan lokal setiap 30 detik (opsional, kalau ada cron job di server)
+    // const interval = setInterval(fetchData, 30000);
+    // return () => clearInterval(interval);
   }, []);
+
+  // --- HELPER: FORMAT UPTIME ---
+  const formatUptime = (uptime: string) => {
+    if (!uptime || uptime === "-" || uptime === "") return "-";
+
+    if (uptime.includes(":")) {
+      const [h, m, s] = uptime.split(":");
+      return `${parseInt(h)} Jam ${parseInt(m)} Menit ${parseInt(s)} Detik`;
+    }
+
+    const parts = uptime.match(/(\d+[wdhms])/g);
+    if (parts) {
+      const unitMap: { [key: string]: string } = {
+        w: "Minggu",
+        d: "Hari",
+        h: "Jam",
+        m: "Menit",
+        s: "Detik",
+      };
+      return parts
+        .map((part) => {
+          const unit = part.slice(-1);
+          const value = part.slice(0, -1);
+          return `${value} ${unitMap[unit] || unit}`;
+        })
+        .join(" ");
+    }
+    return uptime;
+  };
 
   const filteredData = data.filter((item) => {
     const matchesSearch =
@@ -91,20 +120,34 @@ const CustomerMonitoring: React.FC = () => {
               <MonitorPlay className="w-8 h-8 mr-3 text-blue-600" />
               Monitoring Koneksi
             </h1>
-            <p className="text-gray-600 mt-1">
-              Status realtime pelanggan dari MikroTik
-            </p>
+            <div className="flex items-center mt-1 text-gray-600">
+              <Database className="w-4 h-4 mr-1.5" />
+              <span>Data dari Database Lokal</span>
+            </div>
           </div>
-          <button
-            onClick={fetchData}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
-            disabled={loading}
-          >
-            <RefreshCw
-              className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`}
-            />
-            Refresh Status
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={fetchData}
+              className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center"
+              disabled={loadingData || syncing}
+            >
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${loadingData ? "animate-spin" : ""}`}
+              />
+              Refresh View
+            </button>
+
+            <button
+              onClick={handleSync}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center shadow-sm"
+              disabled={syncing}
+            >
+              <RefreshCw
+                className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`}
+              />
+              {syncing ? "Sedang Sync..." : "Sync dari Router"}
+            </button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -191,84 +234,114 @@ const CustomerMonitoring: React.FC = () => {
         </div>
 
         {/* Grid Data */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredData.map((item) => (
-            <div
-              key={item.id}
-              className={`bg-white rounded-lg shadow-sm border transition-all duration-200 hover:shadow-md ${
-                item.status === "online"
-                  ? "border-green-200"
-                  : "border-gray-200 opacity-90"
-              }`}
-            >
-              <div className="p-5">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h4 className="font-bold text-gray-900 text-lg">
-                      {item.name}
-                    </h4>
-                    <div className="flex items-center text-xs text-gray-500 mt-1 font-mono bg-gray-100 px-2 py-0.5 rounded w-fit">
-                      <User className="w-3 h-3 mr-1" /> {item.pppoe_user}
+        {loadingData ? (
+          <div className="flex justify-center items-center h-64 bg-white rounded-lg">
+            <Loader2 className="animate-spin h-10 w-10 text-blue-600" />
+            <span className="ml-3 text-gray-500">Memuat data...</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredData.map((item) => (
+              <div
+                key={item.id}
+                className={`bg-white rounded-lg shadow-sm border transition-all duration-200 hover:shadow-md ${
+                  item.status === "online"
+                    ? "border-green-200"
+                    : "border-gray-200 opacity-90"
+                }`}
+              >
+                <div className="p-5">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h4 className="font-bold text-gray-900 text-lg">
+                        {item.name}
+                      </h4>
+                      <div className="flex items-center text-xs text-gray-500 mt-1 font-mono bg-gray-100 px-2 py-0.5 rounded w-fit">
+                        <User className="w-3 h-3 mr-1" /> {item.pppoe_user}
+                      </div>
+                    </div>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-bold flex items-center ${
+                        item.status === "online"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      {item.status === "online" ? (
+                        <Wifi className="w-3 h-3 mr-1" />
+                      ) : (
+                        <WifiOff className="w-3 h-3 mr-1" />
+                      )}
+                      {item.status.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                      <span className="text-gray-500 flex items-center">
+                        <Network className="w-4 h-4 mr-2" /> IP Address
+                      </span>
+                      <span className="font-mono text-gray-800">
+                        {item.ip_address}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                      <span className="text-gray-500 flex items-center">
+                        <Clock className="w-4 h-4 mr-2" /> Uptime
+                      </span>
+                      <span className="text-gray-800">
+                        {formatUptime(item.uptime)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                      <span className="text-gray-500 flex items-center">
+                        <RefreshCw className="w-4 h-4 mr-2" /> Sync Terakhir
+                      </span>
+                      <span className="text-gray-800 font-medium text-xs">
+                        {item.last_seen
+                          ? new Date(item.last_seen).toLocaleString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "-"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                      <span className="text-gray-500 flex items-center">
+                        <Network className="w-4 h-4 mr-2" /> IP Address
+                      </span>
+                      <span className="text-gray-800 font-medium text-xs font-mono">
+                        {item.ip_address || "-"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-500 text-xs">Paket</span>
+                      <span className="text-blue-600 font-medium">
+                        {item.package}
+                      </span>
                     </div>
                   </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-bold flex items-center ${
-                      item.status === "online"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {item.status === "online" ? (
-                      <Wifi className="w-3 h-3 mr-1" />
-                    ) : (
-                      <WifiOff className="w-3 h-3 mr-1" />
-                    )}
-                    {item.status.toUpperCase()}
-                  </span>
                 </div>
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between items-center border-b border-gray-50 pb-2">
-                    <span className="text-gray-500 flex items-center">
-                      <Network className="w-4 h-4 mr-2" /> IP Address
-                    </span>
-                    <span className="font-mono text-gray-800">
-                      {item.ip_address}
-                    </span>
+                {item.status === "online" && (
+                  <div className="bg-green-50 px-5 py-2 text-xs text-green-700 flex justify-between rounded-b-lg">
+                    <span>Caller ID: {item.caller_id}</span>
+                    <span className="animate-pulse">● Connected</span>
                   </div>
-                  <div className="flex justify-between items-center border-b border-gray-50 pb-2">
-                    <span className="text-gray-500 flex items-center">
-                      <Clock className="w-4 h-4 mr-2" /> Uptime
-                    </span>
-                    <span className="text-gray-800 font-medium">
-                      {formatUptime(item.uptime)}
-                    </span>
+                )}
+                {item.status === "offline" && (
+                  <div className="bg-gray-50 px-5 py-2 text-xs text-gray-500 flex justify-between rounded-b-lg">
+                    <span>Caller ID: {item.caller_id}</span>
+                    <span>Disconnected</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-500 text-xs">Paket</span>
-                    <span className="text-blue-600 font-medium">
-                      {item.package}
-                    </span>
-                  </div>
-                </div>
+                )}
               </div>
-              {item.status === "online" && (
-                <div className="bg-green-50 px-5 py-2 text-xs text-green-700 flex justify-between rounded-b-lg">
-                  <span>Caller ID: {item.caller_id}</span>
-                  <span className="animate-pulse">● Connected</span>
-                </div>
-              )}
-              {item.status === "offline" && (
-                <div className="bg-gray-50 px-5 py-2 text-xs text-gray-500 flex justify-between rounded-b-lg">
-                  <span>Terakhir dilihat: -</span>
-                  <span>Disconnected</span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
-        {!loading && filteredData.length === 0 && (
+        {!loadingData && filteredData.length === 0 && (
           <div className="text-center py-12 text-gray-500 bg-white rounded-lg shadow-sm">
             <WifiOff className="w-12 h-12 mx-auto mb-3 text-gray-300" />
             <p>Tidak ada data pelanggan yang sesuai filter.</p>

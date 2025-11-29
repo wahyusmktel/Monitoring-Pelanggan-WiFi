@@ -85,6 +85,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Di dalam prefix 'infrastructure'
         Route::get('/mikrotik/monitor', [MikrotikController::class, 'monitorCustomers']);
+
+        // Tambahkan route baru untuk sync active
+        Route::post('/mikrotik/sync-active', [MikrotikController::class, 'syncActive']);
     });
 
     // Services Routes

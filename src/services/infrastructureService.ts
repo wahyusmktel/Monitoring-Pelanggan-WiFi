@@ -83,6 +83,7 @@ export interface CustomerMonitorData {
   ip_address: string;
   uptime: string;
   caller_id: string;
+  last_seen?: string;
 }
 
 export interface MonitorResponse {
@@ -374,6 +375,19 @@ export const infrastructureService = {
       return response.data;
     } catch (error) {
       console.error("Error fetching monitoring data:", error);
+      throw error;
+    }
+  },
+
+  // Trigger Sync Status Active
+  syncActiveConnections: async (): Promise<any> => {
+    try {
+      const response = await apiClient.post(
+        "/infrastructure/mikrotik/sync-active"
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error syncing active connections:", error);
       throw error;
     }
   },
