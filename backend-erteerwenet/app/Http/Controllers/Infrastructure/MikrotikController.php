@@ -26,21 +26,24 @@ class MikrotikController extends Controller
         try {
             $secrets = $this->mikrotik->getPppSecrets();
 
-            // Kita manipulasi array-nya untuk cek apakah sudah ada di DB
             $data = collect($secrets)->map(function ($secret) {
-                // Cek apakah user ini ada di tabel customers (berdasarkan customer_number / username)
-                $exists = CustomerPppoeAccount::where('username', $secret['name'])->exists();
+                // Ambil nama/username dengan aman
+                $name = $secret['name'] ?? 'Unknown';
+
+                // Cek sinkronisasi
+                $exists = CustomerPppoeAccount::where('username', $name)->exists();
 
                 return [
-                    'id' => $secret['.id'], // ID internal mikrotik (*1, *2, dll)
-                    'name' => $secret['name'],
+                    // Gunakan '??' untuk memberikan nilai default jika data kosong/tidak ada
+                    'id' => $secret['.id'] ?? null,
+                    'name' => $name,
                     'password' => $secret['password'] ?? '****',
-                    'profile' => $secret['profile'],
+                    'profile' => $secret['profile'] ?? 'default', // <--- INI SUMBER ERRORNYA (Sekarang aman)
                     'local_address' => $secret['local-address'] ?? '-',
                     'remote_address' => $secret['remote-address'] ?? '-',
                     'last_logged_out' => $secret['last-logged-out'] ?? '-',
-                    'disabled' => $secret['disabled'] === 'true',
-                    'is_synced' => $exists // Flag untuk frontend
+                    'disabled' => ($secret['disabled'] ?? 'false') === 'true', // Handle boolean string
+                    'is_synced' => $exists
                 ];
             });
 
