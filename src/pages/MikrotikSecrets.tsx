@@ -90,6 +90,7 @@ const MikrotikSecrets: React.FC = () => {
 
     setMappingLoading(true);
     try {
+      // Kirim seluruh object selectedSecret agar data detail (password, ip, mac) ikut tersimpan
       await infrastructureService.mapMikrotikUser(
         Number(selectedCustomerId),
         selectedSecret
@@ -102,7 +103,7 @@ const MikrotikSecrets: React.FC = () => {
         (c) => c.id === Number(selectedCustomerId)
       );
 
-      // Update UI lokal
+      // Update UI lokal (Optimistic Update)
       setSecrets((prev) =>
         prev.map((s) =>
           s.id === selectedSecret.id
@@ -121,6 +122,10 @@ const MikrotikSecrets: React.FC = () => {
         )
       );
 
+      // Refresh data customer juga agar dropdown terupdate status pppoe-nya
+      const updatedCustomers = await customerService.getCustomers();
+      setCustomers(updatedCustomers);
+
       setShowModal(false);
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Gagal melakukan mapping");
@@ -138,6 +143,27 @@ const MikrotikSecrets: React.FC = () => {
           .toLowerCase()
           .includes(searchTerm.toLowerCase()))
   );
+
+  // Filter customer untuk Dropdown:
+  // 1. Customer yang belum punya akun PPPoE (pppoe_account == null)
+  // 2. ATAU Customer yang sedang terhubung dengan secret ini (untuk kasus edit mapping)
+  const availableCustomers = customers.filter((cust) => {
+    // KONDISI 1: Jika sedang EDIT MAPPING (Data sudah synced),
+    // Tampilkan SEMUA pelanggan. Ini memberikan fleksibilitas jika admin
+    // ingin memindahkan akun ke pelanggan lain (misal karena salah input sebelumnya).
+    if (selectedSecret?.is_synced) {
+      return true;
+    }
+
+    // KONDISI 2: Jika MAPPING BARU,
+    // Sembunyikan pelanggan yang SUDAH punya akun PPPoE agar data tidak ganda.
+    // (Casting ke any untuk akses properti pppoe_account dari API)
+    const hasAccount =
+      (cust as any).pppoe_account !== null &&
+      (cust as any).pppoe_account !== undefined;
+
+    return !hasAccount;
+  });
 
   return (
     <Layout>
@@ -354,7 +380,7 @@ const MikrotikSecrets: React.FC = () => {
                     required
                   >
                     <option value="">-- Pilih Pelanggan --</option>
-                    {customers.map((cust) => (
+                    {availableCustomers.map((cust) => (
                       <option key={cust.id} value={cust.id}>
                         {cust.name}{" "}
                         {cust.customer_number

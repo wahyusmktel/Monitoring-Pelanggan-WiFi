@@ -39,6 +39,32 @@ const CustomerMonitoring: React.FC = () => {
     }
   };
 
+  // --- HELPER: FORMAT UPTIME MIKROTIK ---
+  const formatUptime = (uptime: string) => {
+    if (!uptime || uptime === "-" || uptime === "") return "-";
+
+    // Regex untuk memecah string (misal: 4d5h -> ["4d", "5h"])
+    const parts = uptime.match(/(\d+[wdhms])/g);
+
+    if (!parts) return uptime; // Kembalikan aslinya jika format tidak dikenali
+
+    const unitMap: { [key: string]: string } = {
+      w: "Minggu",
+      d: "Hari",
+      h: "Jam",
+      m: "Menit",
+      s: "Detik",
+    };
+
+    return parts
+      .map((part) => {
+        const unit = part.slice(-1); // Ambil huruf terakhir (w/d/h/m/s)
+        const value = part.slice(0, -1); // Ambil angkanya
+        return `${value} ${unitMap[unit] || unit}`;
+      })
+      .join(" ");
+  };
+
   useEffect(() => {
     fetchData();
     // Auto refresh setiap 60 detik (opsional)
@@ -214,7 +240,9 @@ const CustomerMonitoring: React.FC = () => {
                     <span className="text-gray-500 flex items-center">
                       <Clock className="w-4 h-4 mr-2" /> Uptime
                     </span>
-                    <span className="text-gray-800">{item.uptime}</span>
+                    <span className="text-gray-800 font-medium">
+                      {formatUptime(item.uptime)}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-500 text-xs">Paket</span>
