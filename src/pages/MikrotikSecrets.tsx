@@ -40,7 +40,7 @@ const MikrotikSecrets: React.FC = () => {
   const [syncing, setSyncing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10); // 10 data per halaman
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [filterSyncStatus, setFilterSyncStatus] = useState<
     "all" | "synced" | "unsynced"
   >("all");
@@ -145,6 +145,7 @@ const MikrotikSecrets: React.FC = () => {
     const matchesSearch =
       acc.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
       acc.profile?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      acc.caller_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (acc.customer &&
         acc.customer.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -260,6 +261,9 @@ const MikrotikSecrets: React.FC = () => {
                     IP Address
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Caller ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Pelanggan
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -274,7 +278,7 @@ const MikrotikSecrets: React.FC = () => {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={7}
                       className="px-6 py-10 text-center text-gray-500"
                     >
                       Memuat data database...
@@ -283,7 +287,7 @@ const MikrotikSecrets: React.FC = () => {
                 ) : filteredAccounts.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={7}
                       className="px-6 py-10 text-center text-gray-500"
                     >
                       Data kosong. Silakan Sync dari Router.
@@ -310,6 +314,9 @@ const MikrotikSecrets: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {acc.remote_address || "-"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">
+                          {acc.caller_id || '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {acc.customer ? (
@@ -374,44 +381,70 @@ const MikrotikSecrets: React.FC = () => {
               </tbody>
             </table>
           </div>
-          {/* --- KONTROL PAGINASI --- */}
+          {/* --- KONTROL PAGINASI & DATA PER HALAMAN --- */}
           {filteredAccounts.length > 0 && (
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-              <span className="text-sm text-gray-700">
-                Menampilkan{" "}
-                <span className="font-medium">{indexOfFirstItem + 1}</span>{" "}
-                sampai{" "}
-                <span className="font-medium">
-                  {Math.min(indexOfLastItem, filteredAccounts.length)}
-                </span>{" "}
-                dari{" "}
-                <span className="font-medium">{filteredAccounts.length}</span>{" "}
-                data
-              </span>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.max(prev - 1, 1))
-                  }
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 hover:bg-white transition-colors"
-                >
-                  Sebelumnya
-                </button>
-                <span className="px-3 py-1 text-sm font-medium text-gray-700">
-                  Hal {currentPage} / {totalPages}
-                </span>
-                <button
-                  onClick={() =>
-                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                  }
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 hover:bg-white transition-colors"
-                >
-                  Selanjutnya
-                </button>
+              <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between bg-gray-50 gap-4">
+                  
+                  {/* Bagian Kiri: Info Data & Dropdown Limit */}
+                  <div className="flex items-center space-x-4 text-sm text-gray-700">
+                      <div className="flex items-center">
+                          <span className="mr-2">Baris per hal:</span>
+                          <select
+                              value={itemsPerPage}
+                              onChange={(e) => {
+                                  setItemsPerPage(Number(e.target.value));
+                                  setCurrentPage(1); // Reset ke hal 1 saat limit berubah
+                              }}
+                              className="border border-gray-300 rounded-md text-sm py-1 px-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                          >
+                              <option value={10}>10</option>
+                              <option value={20}>20</option>
+                              <option value={50}>50</option>
+                              <option value={100}>100</option>
+                          </select>
+                      </div>
+                      
+                      <span className="hidden sm:inline text-gray-400">|</span>
+                      
+                      <span>
+                          Menampilkan <span className="font-medium">{indexOfFirstItem + 1}</span> - <span className="font-medium">{Math.min(indexOfLastItem, filteredAccounts.length)}</span> dari <span className="font-medium">{filteredAccounts.length}</span> data
+                      </span>
+                  </div>
+
+                  {/* Bagian Kanan: Tombol Navigasi */}
+                  <div className="flex space-x-2">
+                      <button
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 hover:bg-white transition-colors disabled:cursor-not-allowed"
+                      >
+                          Sebelumnya
+                      </button>
+                      
+                      {/* Opsional: Dropdown Halaman Langsung */}
+                      <span className="flex items-center px-2">
+                          <span className="text-sm text-gray-600 mr-2">Hal</span>
+                          <select
+                              value={currentPage}
+                              onChange={(e) => setCurrentPage(Number(e.target.value))}
+                              className="border border-gray-300 rounded-md text-sm py-0.5 px-1 focus:ring-2 focus:ring-blue-500 outline-none w-12 text-center"
+                          >
+                              {Array.from({ length: totalPages }, (_, i) => (
+                                  <option key={i + 1} value={i + 1}>{i + 1}</option>
+                              ))}
+                          </select>
+                          <span className="text-sm text-gray-600 ml-2">/ {totalPages}</span>
+                      </span>
+
+                      <button
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 hover:bg-white transition-colors disabled:cursor-not-allowed"
+                      >
+                          Selanjutnya
+                      </button>
+                  </div>
               </div>
-            </div>
           )}
           {/* ------------------------ */}
         </div>
