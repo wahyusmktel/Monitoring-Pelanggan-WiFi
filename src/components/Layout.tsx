@@ -270,7 +270,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 >
                   <MonitorPlay className="mr-2 h-4 w-4" />
                   Status Online
-                </Link>
+                </Link>                
               </div>
             )}
           </div>

@@ -16,6 +16,7 @@ import CustomerChangePassword from "@/pages/portal/CustomerChangePassword";
 import CustomerDashboard from "@/pages/portal/CustomerDashboard";
 import MikrotikSecrets from "@/pages/MikrotikSecrets";
 import CustomerMonitoring from "@/pages/CustomerMonitoring";
+import PppoeProfiles from "@/pages/PppoeProfiles";
 import { Toaster } from 'sonner';
 
 // --- SATPAM ADMIN (Cek 'token') ---
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/other" element={<div className="text-center text-xl">Other Page - Coming Soon</div>} />
           <Route path="/mikrotik/secrets" element={<MikrotikSecrets />} />
           <Route path="/customer-monitoring" element={<CustomerMonitoring />} />
+          <Route path="/pppoe-profiles" element={<PppoeProfiles />} />
         </Route>
         {/* --- AREA PELANGGAN (PORTAL) --- */}
         <Route path="/portal/login" element={<CustomerLogin />} />

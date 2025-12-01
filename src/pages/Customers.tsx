@@ -283,25 +283,25 @@ const Customers: React.FC = () => {
     setShowActivationModal(true);
 
     // Load Profile dari Mikrotik saat modal dibuka
-    const toastId = toast.loading("Memuat profile MikroTik...");
+    // const toastId = toast.loading("Memuat profile MikroTik...");
 
     try {
-      const profiles = await infrastructureService.getMikrotikProfiles();
-      console.log("Data Profile:", profiles); // <--- CEK CONSOLE BROWSER
+      // PERUBAHAN: Panggil getProfilesLocal (DB Lokal), bukan getMikrotikProfiles
+      const profiles = await infrastructureService.getProfilesLocal();
 
       if (Array.isArray(profiles) && profiles.length > 0) {
         setPppoeProfiles(profiles);
-        setSelectedProfile(profiles[0].name); // Default pilih yg pertama
-        toast.success("Profile berhasil dimuat", { id: toastId });
+        setSelectedProfile(profiles[0].name);
+        // Tidak perlu toast sukses setiap kali buka modal, cukup diam-diam saja karena cepat
       } else {
-        toast.error("Tidak ada profile ditemukan di MikroTik", { id: toastId });
+        // Jika kosong, mungkin belum disync. Beri saran.
+        toast.warning(
+          "Profile kosong. Silakan Sync di menu Manajemen Profile PPPoE."
+        );
       }
     } catch (e: any) {
       console.error("Error fetch profile:", e);
-      // Tampilkan pesan error asli dari backend jika ada
-      const msg =
-        e.response?.data?.message || "Gagal memuat profile (Cek Koneksi)";
-      toast.error(msg, { id: toastId });
+      toast.error("Gagal memuat data profile lokal.");
     }
   };
 

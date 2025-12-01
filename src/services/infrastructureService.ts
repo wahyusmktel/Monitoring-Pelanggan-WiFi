@@ -95,6 +95,16 @@ export interface MonitorResponse {
   data: CustomerMonitorData[];
 }
 
+export interface MikrotikProfile {
+  id?: number;
+  name: string;
+  local_address?: string;
+  remote_address?: string;
+  rate_limit?: string;
+  dns_server?: string;
+  default?: boolean;
+}
+
 export const infrastructureService = {
   // OLT Services
   getOLTs: async (filters?: InfrastructureFilters): Promise<OLT[]> => {
@@ -390,5 +400,21 @@ export const infrastructureService = {
       console.error("Error syncing active connections:", error);
       throw error;
     }
+  },
+
+  // --- PROFILE MANAGEMENT ---
+  getProfilesLocal: async (): Promise<MikrotikProfile[]> => {
+    const response = await apiClient.get("/infrastructure/profiles");
+    return response.data;
+  },
+
+  syncProfiles: async (): Promise<any> => {
+    const response = await apiClient.post("/infrastructure/profiles/sync");
+    return response.data;
+  },
+
+  createProfile: async (data: MikrotikProfile): Promise<any> => {
+    const response = await apiClient.post("/infrastructure/profiles", data);
+    return response.data;
   },
 };

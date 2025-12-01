@@ -106,4 +106,48 @@ class MikrotikService
 
         return $this->client->query($query)->read();
     }
+
+    /**
+     * Tambah Profile Baru ke MikroTik
+     */
+    public function addPppProfile($data)
+    {
+        if (!$this->client) throw new Exception("Gagal koneksi MikroTik");
+
+        $query = (new Query('/ppp/profile/add'))
+            ->equal('name', $data['name'])
+            ->equal('local-address', $data['local_address'] ?? null)
+            ->equal('remote-address', $data['remote_address'] ?? null)
+            ->equal('rate-limit', $data['rate_limit'] ?? null)
+            ->equal('dns-server', $data['dns_server'] ?? null);
+
+        return $this->client->query($query)->read();
+    }
+
+    /**
+     * Update Profile di MikroTik (Cari berdasarkan ID atau Nama)
+     * Kita pakai 'set' command, butuh ID internal (*1, *2) atau Name
+     */
+    public function setPppProfile($name, $data)
+    {
+        if (!$this->client) throw new Exception("Gagal koneksi MikroTik");
+
+        // Cari ID dulu berdasarkan nama
+        $findQuery = (new Query('/ppp/profile/print'))->where('name', $name);
+        $result = $this->client->query($findQuery)->read();
+
+        if (empty($result)) throw new Exception("Profile tidak ditemukan di Router");
+        $id = $result[0]['.id'];
+
+        // Update
+        $query = (new Query('/ppp/profile/set'))
+            ->equal('.id', $id);
+
+        if (isset($data['local_address'])) $query->equal('local-address', $data['local_address']);
+        if (isset($data['remote_address'])) $query->equal('remote-address', $data['remote_address']);
+        if (isset($data['rate_limit'])) $query->equal('rate-limit', $data['rate_limit']);
+        if (isset($data['dns_server'])) $query->equal('dns-server', $data['dns_server']);
+
+        return $this->client->query($query)->read();
+    }
 }

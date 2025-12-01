@@ -13,6 +13,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Services\BillingSettingController;
 use App\Http\Controllers\CustomerPortal\AuthController as CustomerAuthController;
 use App\Http\Controllers\Infrastructure\MikrotikController;
+use App\Http\Controllers\Infrastructure\MikrotikProfileController;
 use App\Services\MikrotikService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -88,6 +89,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Tambahkan route baru untuk sync active
         Route::post('/mikrotik/sync-active', [MikrotikController::class, 'syncActive']);
+
+        Route::get('/profiles', [MikrotikProfileController::class, 'index']); // Get Local
+        Route::post('/profiles', [MikrotikProfileController::class, 'store']); // Create Baru
+        Route::post('/profiles/sync', [MikrotikProfileController::class, 'sync']); // Sync
     });
 
     // Services Routes
