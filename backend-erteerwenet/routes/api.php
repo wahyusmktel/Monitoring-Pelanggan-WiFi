@@ -93,6 +93,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/profiles', [MikrotikProfileController::class, 'index']); // Get Local
         Route::post('/profiles', [MikrotikProfileController::class, 'store']); // Create Baru
         Route::post('/profiles/sync', [MikrotikProfileController::class, 'sync']); // Sync
+        Route::put('/profiles/{id}', [MikrotikProfileController::class, 'update']);
+        Route::delete('/profiles/{id}', [MikrotikProfileController::class, 'destroy']);
     });
 
     // Services Routes

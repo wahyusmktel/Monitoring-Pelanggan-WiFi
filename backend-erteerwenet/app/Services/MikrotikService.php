@@ -150,4 +150,25 @@ class MikrotikService
 
         return $this->client->query($query)->read();
     }
+
+    /**
+     * Hapus Profile di MikroTik
+     */
+    public function removePppProfile($name)
+    {
+        if (!$this->client) throw new Exception("Gagal koneksi MikroTik");
+
+        // Cari ID dulu
+        $findQuery = (new Query('/ppp/profile/print'))->where('name', $name);
+        $result = $this->client->query($findQuery)->read();
+
+        if (!empty($result)) {
+            $id = $result[0]['.id'];
+            // Hapus
+            $query = (new Query('/ppp/profile/remove'))->equal('.id', $id);
+            return $this->client->query($query)->read();
+        }
+
+        return null; // Anggap sukses jika tidak ditemukan (sudah terhapus)
+    }
 }

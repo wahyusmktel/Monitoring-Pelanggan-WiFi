@@ -417,4 +417,16 @@ export const infrastructureService = {
     const response = await apiClient.post("/infrastructure/profiles", data);
     return response.data;
   },
+
+  updateProfile: async (id: number, data: MikrotikProfile): Promise<any> => {
+    const response = await apiClient.put(
+      `/infrastructure/profiles/${id}`,
+      data
+    );
+    return response.data;
+  },
+
+  deleteProfile: async (id: number): Promise<any> => {
+    await apiClient.delete(`/infrastructure/profiles/${id}`);
+  },
 };

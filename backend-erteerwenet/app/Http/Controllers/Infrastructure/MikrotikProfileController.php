@@ -70,4 +70,47 @@ class MikrotikProfileController extends Controller
             return response()->json(['message' => 'Gagal: ' . $e->getMessage()], 500);
         }
     }
+
+    public function update(Request $request, $id)
+    {
+        $profile = MikrotikProfile::findOrFail($id);
+        $oldName = $profile->name;
+
+        $request->validate([
+            'name' => 'required|string|unique:mikrotik_profiles,name,' . $id
+        ]);
+
+        try {
+            // 1. Update di MikroTik
+            if ($this->mikrotik->isConnected()) {
+                $this->mikrotik->setPppProfile($oldName, $request->all());
+            }
+
+            // 2. Update di DB Lokal
+            $profile->update($request->all());
+
+            return response()->json(['message' => 'Profile berhasil diperbarui', 'data' => $profile]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Gagal update: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function destroy($id)
+    {
+        $profile = MikrotikProfile::findOrFail($id);
+
+        try {
+            // 1. Hapus di MikroTik
+            if ($this->mikrotik->isConnected()) {
+                $this->mikrotik->removePppProfile($profile->name);
+            }
+
+            // 2. Hapus di DB Lokal
+            $profile->delete();
+
+            return response()->json(['message' => 'Profile berhasil dihapus']);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Gagal hapus: ' . $e->getMessage()], 500);
+        }
+    }
 }
