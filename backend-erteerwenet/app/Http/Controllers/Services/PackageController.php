@@ -16,7 +16,7 @@ class PackageController extends Controller
         if ($request->has('search') && $request->search != '') {
             $search = $request->search;
             $query->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                ->orWhere('description', 'like', "%{$search}%");
         }
 
         // 2. Filter Category
@@ -34,7 +34,7 @@ class PackageController extends Controller
         if ($request->has('sort_by')) {
             $sortField = $request->sort_by; // name, price, speed
             $sortOrder = $request->input('sort_order', 'asc'); // asc/desc
-            
+
             // Validasi field agar aman
             if (in_array($sortField, ['name', 'price', 'speed'])) {
                 $query->orderBy($sortField, $sortOrder);
@@ -57,7 +57,7 @@ class PackageController extends Controller
             'quota' => 'required|integer|min:0',
             'price' => 'required|numeric|min:0',
             'duration' => 'required|integer|min:1',
-            'category' => 'required|in:basic,standard,premium,enterprise',
+            'category' => 'required|in:basic,standard,premium,enterprise,family',
             'max_devices' => 'required|integer|min:1',
             'setup_fee' => 'required|numeric|min:0',
             'features' => 'array', // Array of strings
@@ -85,7 +85,7 @@ class PackageController extends Controller
             'quota' => 'sometimes|required|integer|min:0',
             'price' => 'sometimes|required|numeric|min:0',
             'duration' => 'sometimes|required|integer|min:1',
-            'category' => 'sometimes|required|in:basic,standard,premium,enterprise',
+            'category' => 'sometimes|required|in:basic,standard,premium,enterprise,family',
             'max_devices' => 'sometimes|required|integer|min:1',
             'setup_fee' => 'sometimes|required|numeric|min:0',
             'features' => 'array',
