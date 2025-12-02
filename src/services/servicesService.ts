@@ -319,6 +319,12 @@ export const servicesService = {
     return response.data;
   },
 
+  // Hapus Pembayaran
+  deletePayment: async (id: number) => {
+    const response = await apiClient.delete(`/services/payments/${id}`);
+    return response.data;
+  },
+
   getPaymentById: async (id: number): Promise<Payment> => {
     try {
       const response = await apiClient.get(`/services/payments/${id}`);

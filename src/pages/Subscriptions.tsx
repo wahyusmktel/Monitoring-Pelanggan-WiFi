@@ -15,7 +15,7 @@ interface Package {
   duration: number;
   is_active: boolean; // Backend pake snake_case
   features: string[];
-  category: 'basic' | 'standard' | 'premium' | 'enterprise';
+  category: 'basic' | 'standard' | 'premium' | 'enterprise'| 'family';
   max_devices: number; // Backend snake_case
   setup_fee: number; // Backend snake_case
   color?: string;
@@ -30,7 +30,7 @@ interface PackageForm {
   price: number;
   duration: number;
   features: string[];
-  category: 'basic' | 'standard' | 'premium' | 'enterprise';
+  category: 'basic' | 'standard' | 'premium' | 'enterprise'| 'family';
   maxDevices: number;
   setupFee: number;
 }
@@ -128,8 +128,11 @@ const Subscriptions: React.FC = () => {
       newErrors.speed = 'Kecepatan harus lebih dari 0';
     }
     
-    if (formData.price <= 0) {
-      newErrors.price = 'Harga harus lebih dari 0';
+    // Jika kategori family, harga boleh 0. Jika bukan, harus > 0
+    if (formData.category !== 'family' && formData.price <= 0) {
+      newErrors.price = 'Harga harus lebih dari 0 (Kecuali paket Keluarga)';
+    } else if (formData.price < 0) {
+       newErrors.price = 'Harga tidak boleh negatif';
     }
     
     if (formData.duration <= 0) {
@@ -194,7 +197,8 @@ const Subscriptions: React.FC = () => {
       basic: 'blue',
       standard: 'green',
       premium: 'purple',
-      enterprise: 'red'
+      enterprise: 'red',
+      family: 'pink'
     };
     return colors[category as keyof typeof colors] || 'blue';
   };
@@ -387,6 +391,7 @@ const Subscriptions: React.FC = () => {
                 <option value="standard">Standard</option>
                 <option value="premium">Premium</option>
                 <option value="enterprise">Enterprise</option>
+                <option value="family">Keluarga Besar (Gratis)</option>
               </select>
             </div>
 
@@ -438,6 +443,7 @@ const Subscriptions: React.FC = () => {
                           pkg.category === 'basic' ? 'bg-blue-100 text-blue-800' :
                           pkg.category === 'standard' ? 'bg-green-100 text-green-800' :
                           pkg.category === 'premium' ? 'bg-purple-100 text-purple-800' :
+                          pkg.category === 'family' ? 'bg-pink-100 text-pink-800' :
                           'bg-red-100 text-red-800'
                         }`}>
                           {pkg.category.toUpperCase()}
@@ -575,6 +581,7 @@ const Subscriptions: React.FC = () => {
                     <option value="standard">Standard</option>
                     <option value="premium">Premium</option>
                     <option value="enterprise">Enterprise</option>
+                    <option value="family">Keluarga Besar (Gratis)</option>
                   </select>
                 </div>
               </div>

@@ -110,6 +110,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/payments', [PaymentController::class, 'index']);
         Route::post('/payments/generate', [PaymentController::class, 'generateBilling']); // Generate Bulanan
         Route::post('/payments/{id}/pay', [PaymentController::class, 'pay']); // Bayar per ID
+        Route::delete('/payments/{id}', [PaymentController::class, 'destroy']);
 
         // Monitoring Route (Letakkan SEBELUM route dengan {id})
         Route::get('/payments/monitoring', [PaymentController::class, 'monitoring']);

@@ -18,6 +18,7 @@ import {
   Loader2,
   Settings,
   Power,
+  Trash2,
 } from "lucide-react";
 import { servicesService, Payment } from "@/services/servicesService"; // Import service & types
 import { toast } from "sonner";
@@ -138,6 +139,20 @@ const Payments: React.FC = () => {
     } catch (error) {
       console.error(error);
       toast.error("Gagal memproses pembayaran");
+    }
+  };
+
+  // --- 4. DELETE PAYMENT ---
+  const handleDeletePayment = async (id: number) => {
+    if (!confirm("Yakin ingin menghapus data pembayaran ini? Data yang dihapus tidak bisa dikembalikan.")) return;
+
+    try {
+      await servicesService.deletePayment(id);
+      toast.success("Data pembayaran berhasil dihapus");
+      fetchPayments(); // Refresh list
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal menghapus pembayaran");
     }
   };
 
@@ -621,6 +636,15 @@ const Payments: React.FC = () => {
                             <Key className="w-4 h-4" />
                           </button>
                         )}
+                        {/* --- TOMBOL HAPUS --- */}
+                        <button
+                          onClick={() => handleDeletePayment(payment.id)}
+                          className="text-red-600 hover:text-red-900 ml-2"
+                          title="Hapus Pembayaran"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                        {/* -------------------- */}
                       </div>
                     </td>
                   </tr>

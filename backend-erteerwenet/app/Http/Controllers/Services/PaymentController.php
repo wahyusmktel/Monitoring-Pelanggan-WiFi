@@ -61,12 +61,17 @@ class PaymentController extends Controller
                 ->exists();
 
             if (!$exists && $customer->package) {
+                $status = 'pending';
+                // Jika harga 0, otomatis LUNAS
+                if ($customer->package->price <= 0) {
+                    $status = 'paid';
+                }
                 // Buat tagihan baru
                 Payment::create([
                     'customer_id' => $customer->id,
                     'amount' => $customer->package->price, // Ambil harga dari paket saat ini
                     'due_date' => Carbon::create($year, $month, 20), // Jatuh tempo tgl 20
-                    'status' => 'pending',
+                    'status' => $status,
                     'billing_month' => $month,
                     'billing_year' => $year,
                     'description' => "Tagihan Internet {$customer->package->name} Periode {$month}/{$year}",
@@ -171,5 +176,18 @@ class PaymentController extends Controller
             'methods' => $methodStats,
             'customers' => $customerStats
         ]);
+    }
+
+    // Hapus Pembayaran
+    public function destroy($id)
+    {
+        try {
+            $payment = Payment::findOrFail($id);
+            $payment->delete();
+
+            return response()->json(['message' => 'Data pembayaran berhasil dihapus']);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Gagal menghapus: ' . $e->getMessage()], 500);
+        }
     }
 }
