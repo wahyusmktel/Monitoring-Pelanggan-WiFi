@@ -636,7 +636,7 @@ const Subscriptions: React.FC = () => {
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       errors.price ? 'border-red-500' : 'border-gray-300'
                     }`}
-                    min="1"
+                    min={formData.category === 'family' ? "0" : "1"}
                   />
                   {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price}</p>}
                 </div>
