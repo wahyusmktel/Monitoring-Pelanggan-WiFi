@@ -17,10 +17,12 @@ import {
   RefreshCw,
   Loader2,
   Settings,
-  Power,
-  Trash2,
 } from "lucide-react";
-import { servicesService, Payment } from "@/services/servicesService"; // Import service & types
+import {
+  servicesService,
+  Payment,
+  BillingSettings,
+} from "@/services/servicesService";
 import { toast } from "sonner";
 
 const Payments: React.FC = () => {
@@ -31,25 +33,32 @@ const Payments: React.FC = () => {
   // State UI & Filter
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterMonth, setFilterMonth] = useState<number | "all">("all"); // Filter Bulan
+  const [filterYear, setFilterYear] = useState<number | "all">("all"); // Filter Tahun
+
+  // State Paginasi
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Modal States
   const [showBillingModal, setShowBillingModal] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 
-  // Billing Form
+  // Billing Form (Generate)
   const [billingMonth, setBillingMonth] = useState(new Date().getMonth() + 1);
   const [billingYear, setBillingYear] = useState(new Date().getFullYear());
 
-  // --- STATE BARU UNTUK SETTING ---
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [savingSettings, setSavingSettings] = useState(false);
+  // Auto Billing Settings State
   const [billingSettings, setBillingSettings] = useState<BillingSettings>({
     is_active: false,
     generate_day: 1,
-    generate_time: '09:00',
-    is_recurring: true
+    generate_time: "09:00",
+    is_recurring: true,
   });
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // --- 1. FETCH DATA ---
   const fetchPayments = async () => {
@@ -65,7 +74,6 @@ const Payments: React.FC = () => {
     }
   };
 
-  // --- FUNGSI BARU: FETCH SETTING ---
   const fetchSettings = async () => {
     try {
       const settings = await servicesService.getBillingSettings();
@@ -75,7 +83,81 @@ const Payments: React.FC = () => {
     }
   };
 
-  // --- FUNGSI BARU: SIMPAN SETTING ---
+  useEffect(() => {
+    fetchPayments();
+    fetchSettings();
+  }, []);
+
+  // --- 2. LOGIC FILTER ---
+  const filteredPayments = payments.filter((payment) => {
+    const customerName = payment.customer?.name || payment.customerName || "";
+    const customerId =
+      payment.customer?.customer_number || payment.customerId || "";
+    const packageName =
+      payment.subscription?.package?.name || payment.packageName || "";
+
+    const matchesSearch =
+      customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      packageName.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus =
+      filterStatus === "all" || payment.status === filterStatus;
+
+    // Filter Bulan & Tahun
+    const matchesMonth =
+      filterMonth === "all" || payment.billing_month === filterMonth;
+    const matchesYear =
+      filterYear === "all" || payment.billing_year === filterYear;
+
+    return matchesSearch && matchesStatus && matchesMonth && matchesYear;
+  });
+
+  // --- 3. LOGIC PAGINASI ---
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredPayments.slice(
+    indexOfFirstItem,
+    indexOfLastItem
+  );
+  const totalPages = Math.ceil(filteredPayments.length / itemsPerPage);
+
+  // --- 4. ACTIONS ---
+  const handleGenerateBilling = async () => {
+    try {
+      const result = await servicesService.generateBilling(
+        billingMonth,
+        billingYear
+      );
+      toast.success(result.message || "Tagihan berhasil digenerate");
+      setShowBillingModal(false);
+      fetchPayments();
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal membuat tagihan.");
+    }
+  };
+
+  const handleProcessPayment = async (id: number) => {
+    if (!confirm("Konfirmasi pembayaran ini? Status akan menjadi LUNAS."))
+      return;
+
+    try {
+      const result = await servicesService.processPayment(id);
+      toast.success("Pembayaran berhasil! Token telah dibuat.");
+
+      // @ts-ignore
+      const updatedPayment = result.data as Payment;
+      setSelectedPayment(updatedPayment);
+      setShowTokenModal(true);
+
+      fetchPayments();
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal memproses pembayaran");
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingSettings(true);
@@ -90,66 +172,18 @@ const Payments: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchPayments();
-    fetchSettings();
-  }, []);
-
-  // --- 2. GENERATE BILLING ---
-  const handleGenerateBilling = async () => {
-    try {
-      // Panggil API generate billing
-      const result = await servicesService.generateBilling(
-        billingMonth,
-        billingYear
-      );
-
-      // Tampilkan pesan sukses (sesuaikan dengan response JSON backend)
-      // Backend kita mengembalikan { message: "...", count: ... }
-      toast.success(result.message || "Tagihan berhasil digenerate");
-
-      setShowBillingModal(false);
-      fetchPayments(); // Refresh list data
-    } catch (error) {
-      console.error(error);
-      toast.error(
-        "Gagal membuat tagihan. Pastikan belum ada tagihan di periode ini."
-      );
-    }
-  };
-
-  // --- 3. PROCESS PAYMENT ---
-  const handleProcessPayment = async (id: number) => {
-    if (!confirm("Konfirmasi pembayaran ini? Status akan menjadi LUNAS."))
-      return;
-
-    try {
-      const result = await servicesService.processPayment(id);
-      toast.success("Pembayaran berhasil! Token telah dibuat.");
-
-      // Result dari backend berisi { message: "...", data: PaymentObject }
-      // Kita set selectedPayment dengan data terbaru agar token muncul di modal
-      // Perlu casting 'as unknown as Payment' jika struktur backend sedikit berbeda dengan interface frontend sementara
-      const updatedPayment = result.data as unknown as Payment;
-
-      setSelectedPayment(updatedPayment);
-      setShowTokenModal(true);
-
-      fetchPayments(); // Refresh list data di tabel
-    } catch (error) {
-      console.error(error);
-      toast.error("Gagal memproses pembayaran");
-    }
-  };
-
-  // --- 4. DELETE PAYMENT ---
   const handleDeletePayment = async (id: number) => {
-    if (!confirm("Yakin ingin menghapus data pembayaran ini? Data yang dihapus tidak bisa dikembalikan.")) return;
+    if (
+      !confirm(
+        "Yakin ingin menghapus data pembayaran ini? Data yang dihapus tidak bisa dikembalikan."
+      )
+    )
+      return;
 
     try {
       await servicesService.deletePayment(id);
       toast.success("Data pembayaran berhasil dihapus");
-      fetchPayments(); // Refresh list
+      fetchPayments();
     } catch (error) {
       console.error(error);
       toast.error("Gagal menghapus pembayaran");
@@ -157,7 +191,6 @@ const Payments: React.FC = () => {
   };
 
   // --- HELPER FUNCTIONS ---
-
   const getMonthName = (month: number): string => {
     const months = [
       "Januari",
@@ -235,51 +268,23 @@ const Payments: React.FC = () => {
     }).format(amount);
   };
 
-  // Print token functionality
   const printToken = (payment: Payment) => {
     if (payment.token) {
       const printWindow = window.open("", "_blank", "width=400,height=500");
       if (printWindow) {
         printWindow.document.write(`
           <html>
-            <head>
-              <title>Token Internet</title>
-              <style>
-                body { font-family: monospace; padding: 20px; text-align: center; }
-                .header { border-bottom: 2px dashed #000; padding-bottom: 10px; margin-bottom: 20px; }
-                .token { font-size: 24px; font-weight: bold; margin: 20px 0; border: 1px solid #000; padding: 10px; }
-                .footer { border-top: 2px dashed #000; padding-top: 10px; margin-top: 20px; font-size: 12px; }
-              </style>
-            </head>
-            <body>
-              <div class="header">
-                <h3>BUKTI PEMBAYARAN</h3>
-                <p>RT/RW NET</p>
-              </div>
-              
-              <p style="text-align: left;">
-                Pelanggan : ${
-                  payment.customer?.name || payment.customerName
-                }<br/>
-                ID        : ${
-                  payment.customer?.customer_number || payment.customerId
-                }<br/>
-                Periode   : ${getMonthName(payment.billing_month)} ${
-          payment.billing_year
-        }<br/>
-                Status    : LUNAS
-              </p>
-
-              <div class="token">
-                TOKEN: ${payment.token}
-              </div>
-
-              <div class="footer">
-                <p>Terima kasih atas pembayaran Anda.</p>
-                <p>Simpan struk ini sebagai bukti sah.</p>
-              </div>
-
-              <button onclick="window.print()" style="margin-top:20px;">Cetak</button>
+            <head><title>Token Internet</title></head>
+            <body style="font-family: monospace; padding: 20px; text-align: center;">
+              <h2>TOKEN INTERNET</h2>
+              <p>--------------------------------</p>
+              <p>Plg: ${payment.customer?.name || payment.customerName}</p>
+              <p>Bulan: ${payment.billing_month}/${payment.billing_year}</p>
+              <h1 style="font-size: 24px; margin: 20px 0;">${payment.token}</h1>
+              <p>Status: ${payment.token_status}</p>
+              <p>--------------------------------</p>
+              <p>Terima Kasih</p>
+              <script>window.print();</script>
             </body>
           </html>
         `);
@@ -288,45 +293,18 @@ const Payments: React.FC = () => {
     }
   };
 
-  // Filter Logic
-  const filteredPayments = payments.filter((payment) => {
-    // Backend relation: payment.customer.name
-    // Fallback to flat property if backend structure differs slightly
-    const customerName = payment.customer?.name || payment.customerName || "";
-    const customerId =
-      payment.customer?.customer_number || payment.customerId || "";
-    const packageName =
-      payment.subscription?.package?.name || payment.packageName || "";
-
-    const matchesSearch =
-      customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      packageName.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus =
-      filterStatus === "all" || payment.status === filterStatus;
-
-    return matchesSearch && matchesStatus;
-  });
-
-  // Statistics Calculation
   const totalRevenue = filteredPayments
     .filter((p) => p.status === "paid")
-    .reduce((sum, payment) => sum + Number(payment.amount), 0);
-
+    .reduce((sum, p) => sum + Number(p.amount), 0);
   const totalPending = filteredPayments
     .filter((p) => p.status === "pending")
-    .reduce((sum, payment) => sum + Number(payment.amount), 0);
-
+    .reduce((sum, p) => sum + Number(p.amount), 0);
   const totalOverdue = filteredPayments
     .filter((p) => p.status === "overdue")
-    .reduce((sum, payment) => sum + Number(payment.amount), 0);
-
+    .reduce((sum, p) => sum + Number(p.amount), 0);
   const pendingPaymentsCount = filteredPayments.filter(
     (p) => p.status === "pending"
   ).length;
-
-  // --- RENDER UI ---
 
   if (loading) {
     return (
@@ -357,13 +335,14 @@ const Payments: React.FC = () => {
             </p>
           </div>
           <div className="flex space-x-3">
-          <button
+            <button
               onClick={() => setShowSettingsModal(true)}
               className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center"
             >
               <Settings className="w-4 h-4 mr-2" />
               Setting Otomatis
             </button>
+
             <button
               onClick={() => setShowBillingModal(true)}
               className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center"
@@ -371,10 +350,6 @@ const Payments: React.FC = () => {
               <RefreshCw className="w-4 h-4 mr-2" />
               Generate Tagihan
             </button>
-            {/* Tombol Tambah Manual bisa diimplementasikan nanti jika perlu */}
-            {/* <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center">
-              <Plus className="w-4 h-4 mr-2" /> Tambah Manual
-            </button> */}
           </div>
         </div>
 
@@ -395,7 +370,6 @@ const Payments: React.FC = () => {
               </div>
             </div>
           </div>
-
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center">
               <div className="bg-yellow-100 p-3 rounded-lg">
@@ -411,7 +385,6 @@ const Payments: React.FC = () => {
               </div>
             </div>
           </div>
-
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center">
               <div className="bg-red-100 p-3 rounded-lg">
@@ -425,7 +398,6 @@ const Payments: React.FC = () => {
               </div>
             </div>
           </div>
-
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center">
               <div className="bg-blue-100 p-3 rounded-lg">
@@ -445,8 +417,8 @@ const Payments: React.FC = () => {
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Cari Pembayaran
               </label>
@@ -455,20 +427,79 @@ const Payments: React.FC = () => {
                 <input
                   type="text"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   placeholder="Nama pelanggan, ID, atau paket..."
-                  className="pl-10 pr-3 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="pl-10 pr-3 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
+
+            {/* Filter Bulan */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Filter Status
+                Bulan Tagihan
+              </label>
+              <select
+                value={filterMonth}
+                onChange={(e) => {
+                  setFilterMonth(
+                    e.target.value === "all" ? "all" : parseInt(e.target.value)
+                  );
+                  setCurrentPage(1);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">Semua Bulan</option>
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i} value={i + 1}>
+                    {getMonthName(i + 1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Filter Tahun */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tahun Tagihan
+              </label>
+              <select
+                value={filterYear}
+                onChange={(e) => {
+                  setFilterYear(
+                    e.target.value === "all" ? "all" : parseInt(e.target.value)
+                  );
+                  setCurrentPage(1);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">Semua Tahun</option>
+                {Array.from({ length: 5 }, (_, i) => {
+                  const year = new Date().getFullYear() - 2 + i;
+                  return (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            {/* Filter Status */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
               </label>
               <select
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(e) => {
+                  setFilterStatus(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">Semua Status</option>
                 <option value="paid">Lunas</option>
@@ -476,17 +507,21 @@ const Payments: React.FC = () => {
                 <option value="overdue">Jatuh Tempo</option>
               </select>
             </div>
-            <div className="flex items-end">
-              <button
-                onClick={() => {
-                  setSearchTerm("");
-                  setFilterStatus("all");
-                }}
-                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors w-full"
-              >
-                Reset Filter
-              </button>
-            </div>
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={() => {
+                setSearchTerm("");
+                setFilterStatus("all");
+                setFilterMonth("all");
+                setFilterYear("all");
+                setCurrentPage(1);
+              }}
+              className="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-200 w-auto text-sm"
+            >
+              Reset Filter
+            </button>
           </div>
         </div>
 
@@ -496,34 +531,34 @@ const Payments: React.FC = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Pelanggan
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Jumlah
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Paket
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Periode
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Jatuh Tempo
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Token
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Aksi
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPayments.map((payment) => (
+                {currentItems.map((payment) => (
                   <tr key={payment.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -636,15 +671,14 @@ const Payments: React.FC = () => {
                             <Key className="w-4 h-4" />
                           </button>
                         )}
-                        {/* --- TOMBOL HAPUS --- */}
+                        {/* Tombol Hapus (Baru) */}
                         <button
                           onClick={() => handleDeletePayment(payment.id)}
-                          className="text-red-600 hover:text-red-900 ml-2"
+                          className="text-red-600 hover:text-red-900"
                           title="Hapus Pembayaran"
                         >
-                          <Trash2 className="w-5 h-5" />
+                          <Settings className="w-5 h-5 rotate-45" />
                         </button>
-                        {/* -------------------- */}
                       </div>
                     </td>
                   </tr>
@@ -652,10 +686,70 @@ const Payments: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* --- PAGINATION CONTROLS --- */}
+          {filteredPayments.length > 0 && (
+            <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between bg-gray-50 gap-4">
+              <div className="flex items-center space-x-4 text-sm text-gray-700">
+                <div className="flex items-center">
+                  <span className="mr-2">Baris per hal:</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="border border-gray-300 rounded-md text-sm py-1 px-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+                <span className="hidden sm:inline text-gray-400">|</span>
+                <span>
+                  Menampilkan{" "}
+                  <span className="font-medium">{indexOfFirstItem + 1}</span> -{" "}
+                  <span className="font-medium">
+                    {Math.min(indexOfLastItem, filteredPayments.length)}
+                  </span>{" "}
+                  dari{" "}
+                  <span className="font-medium">{filteredPayments.length}</span>{" "}
+                  data
+                </span>
+              </div>
+
+              <div className="flex space-x-2">
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 hover:bg-white transition-colors disabled:cursor-not-allowed"
+                >
+                  Sebelumnya
+                </button>
+                <span className="px-3 py-1 text-sm font-medium text-gray-700">
+                  Hal {currentPage} / {totalPages}
+                </span>
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 hover:bg-white transition-colors disabled:cursor-not-allowed"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {filteredPayments.length === 0 && (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <div className="bg-white rounded-lg shadow-md p-8 text-center mt-4">
             <DollarSign className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               Tidak ada data pembayaran
@@ -666,109 +760,159 @@ const Payments: React.FC = () => {
           </div>
         )}
 
-        {/* --- MODAL SETTING BARU --- */}
+        {/* Modals (Billing Settings, Generate, Token) Tetap Sama */}
         {showSettingsModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-lg max-w-md w-full">
-                    <div className="p-6">
-                        <div className="flex items-center mb-6">
-                            <Settings className="w-6 h-6 text-gray-700 mr-2" />
-                            <h2 className="text-2xl font-bold text-gray-900">Pengaturan Otomatisasi</h2>
-                        </div>
-
-                        <form onSubmit={handleSaveSettings} className="space-y-5">
-                            
-                            {/* SWITCH AKTIF/NONAKTIF */}
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                <div>
-                                    <label className="font-medium text-gray-900 block">Status Otomatisasi</label>
-                                    <span className="text-xs text-gray-500">Aktifkan generate tagihan otomatis</span>
-                                </div>
-                                <button 
-                                    type="button"
-                                    onClick={() => setBillingSettings(prev => ({...prev, is_active: !prev.is_active}))}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${billingSettings.is_active ? 'bg-green-500' : 'bg-gray-300'}`}
-                                >
-                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${billingSettings.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
-                                </button>
-                            </div>
-
-                            {/* FORM SETTING */}
-                            <div className={`space-y-4 transition-all duration-300 ${billingSettings.is_active ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Eksekusi (Tiap Bulan)</label>
-                                    <select 
-                                        value={billingSettings.generate_day}
-                                        onChange={(e) => setBillingSettings({...billingSettings, generate_day: parseInt(e.target.value)})}
-                                        className="w-full border-gray-300 rounded-lg border p-2"
-                                    >
-                                        {[...Array(28)].map((_, i) => (
-                                            <option key={i} value={i+1}>Tanggal {i+1}</option>
-                                        ))}
-                                    </select>
-                                    <p className="text-xs text-gray-500 mt-1">Disarankan tanggal 1-5 awal bulan.</p>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Jam Eksekusi</label>
-                                    <input 
-                                        type="time" 
-                                        value={billingSettings.generate_time}
-                                        onChange={(e) => setBillingSettings({...billingSettings, generate_time: e.target.value})}
-                                        className="w-full border-gray-300 rounded-lg border p-2"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Tipe Pengulangan</label>
-                                    <div className="flex space-x-4">
-                                        <label className="flex items-center">
-                                            <input 
-                                                type="radio" 
-                                                checked={billingSettings.is_recurring} 
-                                                onChange={() => setBillingSettings({...billingSettings, is_recurring: true})}
-                                                className="mr-2 text-blue-600"
-                                            />
-                                            <span className="text-sm text-gray-700">Setiap Bulan</span>
-                                        </label>
-                                        <label className="flex items-center">
-                                            <input 
-                                                type="radio" 
-                                                checked={!billingSettings.is_recurring} 
-                                                onChange={() => setBillingSettings({...billingSettings, is_recurring: false})}
-                                                className="mr-2 text-blue-600"
-                                            />
-                                            <span className="text-sm text-gray-700">Sekali Saja</span>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex justify-end space-x-3 pt-4 border-t">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowSettingsModal(false)}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={savingSettings}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-                                >
-                                    {savingSettings ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : null}
-                                    Simpan Pengaturan
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-md w-full">
+              <div className="p-6">
+                <div className="flex items-center mb-6">
+                  <Settings className="w-6 h-6 text-gray-700 mr-2" />
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Pengaturan Otomatisasi
+                  </h2>
                 </div>
+                <form onSubmit={handleSaveSettings} className="space-y-5">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div>
+                      <label className="font-medium text-gray-900 block">
+                        Status Otomatisasi
+                      </label>
+                      <span className="text-xs text-gray-500">
+                        Aktifkan generate tagihan otomatis
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setBillingSettings((prev) => ({
+                          ...prev,
+                          is_active: !prev.is_active,
+                        }))
+                      }
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                        billingSettings.is_active
+                          ? "bg-green-500"
+                          : "bg-gray-300"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          billingSettings.is_active
+                            ? "translate-x-6"
+                            : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <div
+                    className={`space-y-4 transition-all duration-300 ${
+                      billingSettings.is_active
+                        ? "opacity-100"
+                        : "opacity-50 pointer-events-none"
+                    }`}
+                  >
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tanggal Eksekusi (Tiap Bulan)
+                      </label>
+                      <select
+                        value={billingSettings.generate_day}
+                        onChange={(e) =>
+                          setBillingSettings({
+                            ...billingSettings,
+                            generate_day: parseInt(e.target.value),
+                          })
+                        }
+                        className="w-full border-gray-300 rounded-lg border p-2"
+                      >
+                        {[...Array(28)].map((_, i) => (
+                          <option key={i} value={i + 1}>
+                            Tanggal {i + 1}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Jam Eksekusi
+                      </label>
+                      <input
+                        type="time"
+                        value={billingSettings.generate_time}
+                        onChange={(e) =>
+                          setBillingSettings({
+                            ...billingSettings,
+                            generate_time: e.target.value,
+                          })
+                        }
+                        className="w-full border-gray-300 rounded-lg border p-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Tipe Pengulangan
+                      </label>
+                      <div className="flex space-x-4">
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            checked={billingSettings.is_recurring}
+                            onChange={() =>
+                              setBillingSettings({
+                                ...billingSettings,
+                                is_recurring: true,
+                              })
+                            }
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-700">
+                            Setiap Bulan
+                          </span>
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            checked={!billingSettings.is_recurring}
+                            onChange={() =>
+                              setBillingSettings({
+                                ...billingSettings,
+                                is_recurring: false,
+                              })
+                            }
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-700">
+                            Sekali Saja
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-3 pt-4 border-t">
+                    <button
+                      type="button"
+                      onClick={() => setShowSettingsModal(false)}
+                      className="px-4 py-2 border rounded-lg"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingSettings}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center"
+                    >
+                      {savingSettings ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : null}{" "}
+                      Simpan
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
+          </div>
         )}
-        {/* -------------------------- */}
 
-        {/* Billing Generation Modal */}
         {showBillingModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg max-w-md w-full">
@@ -776,7 +920,6 @@ const Payments: React.FC = () => {
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">
                   Generate Tagihan
                 </h2>
-
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -787,7 +930,7 @@ const Payments: React.FC = () => {
                       onChange={(e) =>
                         setBillingMonth(parseInt(e.target.value))
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     >
                       {Array.from({ length: 12 }, (_, i) => (
                         <option key={i + 1} value={i + 1}>
@@ -796,7 +939,6 @@ const Payments: React.FC = () => {
                       ))}
                     </select>
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Tahun
@@ -804,42 +946,36 @@ const Payments: React.FC = () => {
                     <select
                       value={billingYear}
                       onChange={(e) => setBillingYear(parseInt(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     >
-                      {Array.from({ length: 5 }, (_, i) => (
-                        <option key={2024 + i} value={2024 + i}>
-                          {2024 + i}
-                        </option>
-                      ))}
+                      {Array.from({ length: 5 }, (_, i) => {
+                        const year = 2024 + i; // Atau dynamic year
+                        return (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
-
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <div className="flex">
-                      <AlertCircle className="w-5 h-5 text-yellow-400 mr-2" />
-                      <div className="text-sm text-yellow-800">
-                        <p className="font-medium">Perhatian!</p>
-                        <p>
-                          Tagihan akan dibuat untuk pelanggan aktif yang belum
-                          memiliki tagihan untuk periode yang dipilih.
-                        </p>
-                      </div>
-                    </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
+                    <p className="font-medium">Perhatian!</p>
+                    <p>
+                      Tagihan akan dibuat untuk pelanggan aktif yang belum
+                      memiliki tagihan untuk periode yang dipilih.
+                    </p>
                   </div>
                 </div>
-
                 <div className="flex justify-end space-x-3 pt-6">
                   <button
-                    type="button"
                     onClick={() => setShowBillingModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                    className="px-4 py-2 border rounded-lg"
                   >
                     Batal
                   </button>
                   <button
-                    type="button"
                     onClick={handleGenerateBilling}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg"
                   >
                     Generate Tagihan
                   </button>
@@ -849,55 +985,46 @@ const Payments: React.FC = () => {
           </div>
         )}
 
-        {/* Token Display Modal */}
         {showTokenModal && selectedPayment && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-md w-full">
-              <div className="p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                  Token Internet
-                </h2>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nama Pelanggan
-                    </label>
-                    <p className="text-lg font-medium text-gray-900">
-                      {selectedPayment.customer?.name ||
-                        selectedPayment.customerName}
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                Token Internet
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nama Pelanggan
+                  </label>
+                  <p className="text-lg font-medium text-gray-900">
+                    {selectedPayment.customer?.name ||
+                      selectedPayment.customerName}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Token
+                  </label>
+                  <div className="bg-gray-100 p-4 rounded-lg">
+                    <p className="text-2xl font-bold text-center text-gray-900 font-mono">
+                      {selectedPayment.token}
                     </p>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Token
-                    </label>
-                    <div className="bg-gray-100 p-4 rounded-lg">
-                      <p className="text-2xl font-bold text-center text-gray-900 font-mono">
-                        {selectedPayment.token}
-                      </p>
-                    </div>
-                  </div>
-
+                </div>
+                <div className="flex justify-between">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Status
                     </label>
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTokenStatusColor(
-                        selectedPayment.token_status ||
-                          selectedPayment.tokenStatus ||
-                          "unused"
+                        selectedPayment.token_status || "unused"
                       )}`}
                     >
-                      {selectedPayment.token_status ||
-                        selectedPayment.tokenStatus ||
-                        "unused"}
+                      {selectedPayment.token_status || "unused"}
                     </span>
                   </div>
-
-                  <div>
+                  <div className="text-right">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Periode
                     </label>
@@ -907,27 +1034,23 @@ const Payments: React.FC = () => {
                     </p>
                   </div>
                 </div>
-
-                <div className="flex justify-end space-x-3 pt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowTokenModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    Tutup
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      printToken(selectedPayment);
-                      setShowTokenModal(false);
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
-                  >
-                    <Printer className="w-4 h-4 mr-2" />
-                    Cetak
-                  </button>
-                </div>
+              </div>
+              <div className="flex justify-end space-x-3 pt-6">
+                <button
+                  onClick={() => setShowTokenModal(false)}
+                  className="px-4 py-2 border rounded-lg"
+                >
+                  Tutup
+                </button>
+                <button
+                  onClick={() => {
+                    printToken(selectedPayment);
+                    setShowTokenModal(false);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center"
+                >
+                  <Printer className="w-4 h-4 mr-2" /> Cetak
+                </button>
               </div>
             </div>
           </div>
