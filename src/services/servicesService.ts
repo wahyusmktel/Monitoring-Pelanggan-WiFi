@@ -358,12 +358,12 @@ export const servicesService = {
     }
   },
 
-  deletePayment: async (id: number): Promise<void> => {
-    try {
-      await apiClient.delete(`/services/payments/${id}`);
-    } catch (error) {
-      console.error(`Error deleting payment ${id}:`, error);
-      throw error;
-    }
-  },
+  // deletePayment: async (id: number): Promise<void> => {
+  //   try {
+  //     await apiClient.delete(`/services/payments/${id}`);
+  //   } catch (error) {
+  //     console.error(`Error deleting payment ${id}:`, error);
+  //     throw error;
+  //   }
+  // },
 };
